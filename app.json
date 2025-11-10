@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ToDoApp",
+    "name": "Planificador Inteligente",
     "slug": "ToDoApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,9 +9,15 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.personal.todoapp",
+      "infoPlist": {
+        "NSCalendarsUsageDescription": "Esta aplicación necesita acceso a tu calendario para importar y sincronizar tareas.",
+        "NSRemindersUsageDescription": "Esta aplicación necesita acceso a tus recordatorios para gestionar tareas."
+      }
     },
     "android": {
+      "package": "com.personal.todoapp",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -19,7 +25,11 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "READ_CALENDAR",
+        "WRITE_CALENDAR"
+      ]
     },
     "web": {
       "output": "static",
@@ -38,11 +48,20 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "La aplicación necesita acceso a tu calendario para sincronizar tareas."
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "GEMINI_API_KEY": "${GEMINI_API_KEY}"
     }
   }
 }
