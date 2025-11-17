@@ -92,11 +92,78 @@ export class GoogleCalendarService {
         endDate
       );
 
-      return events.map(event => this.convertEventToTask(event));
+      // Filtrar eventos que no deberían ser tareas
+      const filteredEvents = events.filter(event => this.shouldImportAsTask(event));
+
+      return filteredEvents.map(event => this.convertEventToTask(event));
     } catch (error) {
       console.error('Error importing calendar events:', error);
       throw error;
     }
+  }
+
+  /**
+   * Determina si un evento debería importarse como tarea
+   */
+  private shouldImportAsTask(event: Calendar.Event): boolean {
+    const title = (event.title || '').toLowerCase();
+    const notes = (event.notes || '').toLowerCase();
+    const combined = `${title} ${notes}`;
+
+    // Filtrar días festivos y eventos automáticos
+    const excludePatterns = [
+      // Días festivos
+      'christmas', 'navidad', 'año nuevo', 'new year', 'easter', 'pascua',
+      'thanksgiving', 'independence day', 'día de la independencia', 
+      'halloween', 'valentine', 'san valentín', 'mother\'s day', 'día de la madre',
+      'father\'s day', 'día del padre', 'labor day', 'día del trabajo',
+      
+      // Cumpleaños automáticos
+      'birthday', 'cumpleaños', 'aniversario', 'anniversary',
+      
+      // Eventos automáticos/recurrentes del sistema
+      'holiday', 'feriado', 'festivo', 'day off', 'día libre',
+      'vacation', 'vacaciones', 'break', 'descanso',
+      
+      // Eventos de todo el día que suelen ser informativos
+      'reminder', 'recordatorio', 'notification', 'notificación'
+    ];
+
+    // Si contiene algún patrón excluido, no importar
+    for (const pattern of excludePatterns) {
+      if (combined.includes(pattern)) {
+        console.log(`🚫 Skipping event: "${event.title}" (matched: ${pattern})`);
+        return false;
+      }
+    }
+
+    // Si es un evento de todo el día sin descripción específica, probablemente es festivo
+    const isAllDay = this.isAllDayEvent(event);
+    if (isAllDay && (!event.notes || event.notes.trim().length < 10)) {
+      console.log(`🚫 Skipping all-day event without details: "${event.title}"`);
+      return false;
+    }
+
+    // Si tiene menos de 3 caracteres, probablemente no es útil
+    if (title.trim().length < 3) {
+      console.log(`🚫 Skipping too short event: "${event.title}"`);
+      return false;
+    }
+
+    console.log(`✅ Importing event: "${event.title}"`);
+    return true;
+  }
+
+  /**
+   * Determina si un evento es de todo el día
+   */
+  private isAllDayEvent(event: Calendar.Event): boolean {
+    const start = new Date(event.startDate);
+    const end = new Date(event.endDate);
+    const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    
+    // Si dura 24 horas o más y empieza a medianoche, probablemente es todo el día
+    return durationHours >= 24 && start.getHours() === 0 && start.getMinutes() === 0;
   }
 
   /**
@@ -107,21 +174,28 @@ export class GoogleCalendarService {
     const endDate = new Date(event.endDate);
     const duration = Math.floor((endDate.getTime() - startDate.getTime()) / 60000);
 
+    // Extraer más información del evento
+    const title = event.title || 'Sin título';
+    const description = event.notes || event.location || undefined;
+    const category = this.inferCategory(title, description);
+    const priority = this.inferPriority(title, description, startDate);
+
     return {
       id: event.id,
-      title: event.title || 'Sin título',
-      description: event.notes || undefined,
-      category: this.inferCategory(event.title || ''),
-      priority: Priority.MEDIUM,
-      estimatedEffort: duration,
+      title,
+      description,
+      category,
+      priority,
+      estimatedEffort: duration > 0 ? duration : 60,
       dueDate: startDate,
       createdAt: new Date(),
       status: TaskStatus.PENDING,
       energyRequired: this.inferEnergyLevel(duration),
-      impact: 5,
+      impact: this.inferImpact(title, description),
       urgency: this.calculateUrgency(startDate),
       personalAffinity: 5,
       googleCalendarEventId: event.id,
+      tags: event.location ? [event.location] : undefined,
     };
   }
 
@@ -232,23 +306,95 @@ export class GoogleCalendarService {
   // MÉTODOS DE UTILIDAD
   // ============================================
 
-  private inferCategory(title: string): TaskCategory {
+  private inferCategory(title: string, description?: string): TaskCategory {
     const lowerTitle = title.toLowerCase();
+    const lowerDesc = (description || '').toLowerCase();
+    const combined = `${lowerTitle} ${lowerDesc}`;
     
-    if (lowerTitle.includes('meeting') || lowerTitle.includes('reunión')) {
+    if (combined.includes('meeting') || combined.includes('reunión') || combined.includes('trabajo') || combined.includes('work') || combined.includes('junta')) {
       return TaskCategory.WORK;
     }
-    if (lowerTitle.includes('gym') || lowerTitle.includes('exercise') || lowerTitle.includes('deporte')) {
+    if (combined.includes('gym') || combined.includes('exercise') || combined.includes('deporte') || combined.includes('salud') || combined.includes('health')) {
       return TaskCategory.HEALTH;
     }
-    if (lowerTitle.includes('learn') || lowerTitle.includes('study') || lowerTitle.includes('curso')) {
+    if (combined.includes('learn') || combined.includes('study') || combined.includes('curso') || combined.includes('clase') || combined.includes('aprender')) {
       return TaskCategory.LEARNING;
     }
-    if (lowerTitle.includes('creative') || lowerTitle.includes('design') || lowerTitle.includes('diseño')) {
+    if (combined.includes('creative') || combined.includes('design') || combined.includes('diseño') || combined.includes('arte') || combined.includes('crear')) {
       return TaskCategory.CREATIVE;
+    }
+    if (combined.includes('admin') || combined.includes('papeleo') || combined.includes('trámite') || combined.includes('documento')) {
+      return TaskCategory.ADMINISTRATIVE;
+    }
+    if (combined.includes('social') || combined.includes('amigos') || combined.includes('familia') || combined.includes('fiesta')) {
+      return TaskCategory.SOCIAL;
     }
     
     return TaskCategory.PERSONAL;
+  }
+
+  private inferPriority(title: string, description: string | undefined, dueDate: Date): Priority {
+    const combined = `${title} ${description || ''}`.toLowerCase();
+    const urgency = this.calculateUrgency(dueDate);
+    
+    // CRÍTICO: Verificar fecha de vencimiento PRIMERO
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+    const daysUntilDue = Math.floor((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Si vence HOY o está vencida -> SIEMPRE URGENTE
+    if (daysUntilDue <= 0) {
+      return Priority.URGENT;
+    }
+    
+    // Si vence mañana -> ALTA como mínimo
+    if (daysUntilDue === 1) {
+      return Priority.HIGH;
+    }
+    
+    // Si vence en 2-3 días -> MEDIA como mínimo (puede ser ALTA con palabras clave)
+    if (daysUntilDue <= 3) {
+      if (combined.includes('urgent') || combined.includes('urgente') || combined.includes('importante')) {
+        return Priority.URGENT;
+      }
+      return Priority.HIGH;
+    }
+    
+    // Palabras clave para prioridad (solo si no está cerca de vencer)
+    if (combined.includes('urgent') || combined.includes('urgente') || combined.includes('asap')) {
+      return Priority.URGENT;
+    }
+    if (combined.includes('high') || combined.includes('alta') || combined.includes('importante') || combined.includes('crítico')) {
+      return Priority.HIGH;
+    }
+    if (combined.includes('low') || combined.includes('baja') || combined.includes('opcional')) {
+      return Priority.LOW;
+    }
+    
+    // Basado en urgencia de fecha (para fechas lejanas)
+    if (urgency >= 8) return Priority.URGENT;
+    if (urgency >= 6) return Priority.HIGH;
+    if (urgency >= 4) return Priority.MEDIUM;
+    return Priority.LOW;
+  }
+
+  private inferImpact(title: string, description?: string): number {
+    const combined = `${title} ${description || ''}`.toLowerCase();
+    
+    // Palabras de alto impacto
+    if (combined.includes('proyecto') || combined.includes('presentación') || combined.includes('entrega') || combined.includes('deadline')) {
+      return 8;
+    }
+    if (combined.includes('importante') || combined.includes('critical') || combined.includes('key')) {
+      return 7;
+    }
+    if (combined.includes('reunión') || combined.includes('meeting') || combined.includes('junta')) {
+      return 6;
+    }
+    
+    return 5; // Impacto medio por defecto
   }
 
   private inferEnergyLevel(durationMinutes: number): EnergyLevel {

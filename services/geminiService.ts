@@ -10,8 +10,8 @@ import {
 } from '../types';
 import { ENV } from '../constants/env';
 
-// Configuración de la API
 const GEMINI_API_KEY = ENV.GEMINI_API_KEY;
+const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 export class GeminiService {
   private static instance: GeminiService;
@@ -19,8 +19,25 @@ export class GeminiService {
   private model: any;
 
   private constructor() {
+    console.log('🔑 Initializing Gemini with gemini-2.5-flash...');
+    console.log('API Key length:', GEMINI_API_KEY?.length || 0);
+    
+    if (!GEMINI_API_KEY || GEMINI_API_KEY.length < 20) {
+      console.error('❌ GEMINI_API_KEY is missing or invalid');
+      throw new Error('Gemini API key no configurada correctamente');
+    }
+    
     this.genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+    this.model = this.genAI.getGenerativeModel({ 
+      model: 'gemini-2.5-flash',
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 2048,
+      },
+    });
+    console.log('✅ Gemini service initialized successfully');
   }
 
   static getInstance(): GeminiService {
@@ -30,299 +47,297 @@ export class GeminiService {
     return GeminiService.instance;
   }
 
-  /**
-   * Analiza tareas y devuelve una recomendación inteligente
-   */
-  async analyzeTasksAndRecommend(
-    request: GeminiAnalysisRequest
-  ): Promise<GeminiRecommendation | null> {
+  async analyzeTasksAndRecommend(request: GeminiAnalysisRequest): Promise<GeminiRecommendation | null> {
     try {
-      const prompt = this.buildAnalysisPrompt(request);
-      const result = await this.model.generateContent(prompt);
-      const response = result.response;
-      const text = response.text();
+      console.log('🤖 Starting task analysis with Gemini...');
 
-      // Parsear respuesta JSON
-      const analysis = this.parseGeminiResponse(text);
-      
-      if (!analysis) {
-        throw new Error('Failed to parse Gemini response');
-      }
-
-      return this.buildRecommendation(analysis, request.tasks);
-    } catch (error) {
-      console.error('Error analyzing tasks with Gemini:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Construye el prompt para Gemini
-   */
-  private buildAnalysisPrompt(request: GeminiAnalysisRequest): string {
-    const { tasks, currentTime, userProfile, recentHistory } = request;
-
-    const currentHour = currentTime.getHours();
-    const currentEnergy = this.getCurrentEnergyLevel(userProfile, currentHour);
-    
-    const activeRules = userProfile.personalRules
-      .filter(rule => rule.active)
-      .map(rule => `- ${rule.description}`)
-      .join('\n');
-
-    const tasksList = tasks
-      .filter(task => task.status === 'pending' || task.status === 'in_progress')
-      .map((task, index) => {
-        const daysUntilDue = task.dueDate 
-          ? Math.floor((task.dueDate.getTime() - currentTime.getTime()) / (1000 * 60 * 60 * 24))
-          : null;
-        
-        return `${index + 1}. **${task.title}**
-   - ID: ${task.id}
-   - Categoría: ${task.category}
-   - Esfuerzo estimado: ${task.estimatedEffort} minutos
-   - Energía requerida: ${task.energyRequired}
-   - Impacto: ${task.impact}/10
-   - Urgencia: ${task.urgency}/10
-   - Afinidad personal: ${task.personalAffinity}/10
-   - Fecha límite: ${task.dueDate ? task.dueDate.toLocaleDateString() : 'No especificada'}
-   - Días hasta vencimiento: ${daysUntilDue !== null ? daysUntilDue : 'N/A'}
-   - Descripción: ${task.description || 'Sin descripción'}`;
-      })
-      .join('\n\n');
-
-    const historyInsights = this.generateHistoryInsights(recentHistory);
-
-    const prompt = `Eres un asistente de productividad impulsado por IA. Tu objetivo es analizar las tareas del usuario y recomendar cuál debería hacer AHORA mismo, considerando múltiples factores.
-
-## CONTEXTO ACTUAL
-
-**Hora actual:** ${currentTime.toLocaleString('es-ES')}
-**Día de la semana:** ${this.getDayName(currentTime.getDay())}
-**Nivel de energía del usuario:** ${currentEnergy}
-
-## PERFIL DE ENERGÍA DEL USUARIO
-
-${this.formatEnergyProfile(userProfile)}
-
-## REGLAS PERSONALES ACTIVAS
-
-${activeRules || 'Sin reglas personales configuradas'}
-
-## TAREAS PENDIENTES
-
-${tasksList}
-
-## HISTORIAL RECIENTE DE DECISIONES
-
-${historyInsights}
-
-## TU TAREA
-
-Analiza todas las tareas pendientes y recomienda UNA tarea específica que el usuario debería hacer AHORA. Considera:
-
-1. **Nivel de energía actual**: La tarea debe coincidir con la energía disponible del usuario
-2. **Urgencia**: Prioriza tareas próximas a vencer
-3. **Impacto**: Tareas con mayor impacto son más importantes
-4. **Afinidad personal**: El usuario prefiere ciertas tareas
-5. **Esfuerzo estimado**: ¿Tiene tiempo suficiente ahora?
-6. **Reglas personales**: SIEMPRE respeta las reglas del usuario
-7. **Patrones históricos**: Aprende de decisiones pasadas
-
-## FORMATO DE RESPUESTA
-
-Responde ÚNICAMENTE con un objeto JSON válido (sin markdown, sin explicaciones adicionales):
-
-\`\`\`json
-{
-  "recommendedTaskId": "ID de la tarea recomendada",
-  "reasoning": "Explicación detallada de por qué esta tarea es la mejor opción ahora (mínimo 100 palabras)",
-  "confidenceScore": 0.85,
-  "contextualFactors": [
-    {
-      "factor": "Energía actual",
-      "weight": 0.3,
-      "description": "Tu energía está en nivel alto, ideal para tareas complejas"
-    },
-    {
-      "factor": "Urgencia",
-      "weight": 0.25,
-      "description": "Esta tarea vence en 2 días"
-    }
-  ],
-  "alternativeTaskIds": ["id1", "id2", "id3"],
-  "estimatedCompletionTime": 60,
-  "energyAlignment": 0.9,
-  "urgencyScore": 0.7,
-  "impactScore": 0.8
-}
-\`\`\`
-
-IMPORTANTE: 
-- NO incluyas ningún texto fuera del JSON
-- Asegúrate de que el JSON sea válido
-- Los IDs deben corresponder a tareas existentes
-- El reasoning debe ser específico y personalizado`;
-
-    return prompt;
-  }
-
-  /**
-   * Parsea la respuesta de Gemini
-   */
-  private parseGeminiResponse(text: string): any {
-    try {
-      // Limpiar respuesta (eliminar markdown si existe)
-      let cleanText = text.trim();
-      
-      // Eliminar bloques de código markdown
-      cleanText = cleanText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-      
-      // Encontrar el objeto JSON
-      const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        console.error('No JSON found in response:', text);
+      if (!request.tasks || request.tasks.length === 0) {
+        console.log('📭 No tasks to analyze');
         return null;
       }
 
-      return JSON.parse(jsonMatch[0]);
+      const prompt = this.buildAnalysisPrompt(request);
+      console.log('📤 Sending prompt to Gemini...');
+      
+      const text = await this.callGeminiWithRetry(prompt);
+      console.log('📝 Raw Gemini response:', text);
+      
+      const analysis = this.parseGeminiResponse(text);
+      if (!analysis) {
+        console.log('❌ Failed to parse response, returning default');
+        return this.createDefaultRecommendation(request.tasks);
+      }
+      
+      const recommendation = this.buildRecommendation(analysis, request.tasks);
+      if (!recommendation) {
+        console.log('❌ Failed to build recommendation, returning default');
+        return this.createDefaultRecommendation(request.tasks);
+      }
+      
+      console.log('✅ Analysis completed successfully');
+      return recommendation;
+
+    } catch (error: any) {
+      console.error('❌ Error analyzing tasks with Gemini:', error);
+      return this.createDefaultRecommendation(request.tasks || []);
+    }
+  }
+
+  private async callGeminiWithRetry(prompt: string, retries: number = 2): Promise<string> {
+    for (let i = 0; i < retries; i++) {
+      try {
+        console.log(`🔄 Attempt ${i + 1}/${retries}`);
+        
+        try {
+          const result = await this.model.generateContent(prompt);
+          const text = result.response.text();
+          console.log('✅ SDK response received');
+          return text;
+        } catch (sdkError: any) {
+          console.log('⚠️ SDK failed, trying direct REST API...');
+          
+          const response = await fetch(
+            `${API_URL}/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                  temperature: 0.7,
+                  topK: 40,
+                  topP: 0.95,
+                  maxOutputTokens: 2048,
+                }
+              })
+            }
+          );
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            console.error('❌ REST API error:', response.status, errorData);
+            throw new Error(`API Error ${response.status}`);
+          }
+
+          const data = await response.json();
+          console.log('✅ REST API response received');
+          
+          const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!content) throw new Error('No text content in API response');
+          
+          return content;
+        }
+      } catch (error: any) {
+        console.error(`❌ Attempt ${i + 1} failed:`, error.message);
+        if (i === retries - 1) throw error;
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      }
+    }
+    throw new Error('All retry attempts failed');
+  }
+
+  private parseGeminiResponse(text: string): any {
+    console.log('🔍 Parsing Gemini response...');
+    
+    try {
+      let cleanText = text.trim();
+      
+      // Buscar JSON en bloques de código
+      const codeBlockMatch = cleanText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (codeBlockMatch) {
+        console.log('📋 Found JSON in code block');
+        return JSON.parse(codeBlockMatch[1].trim());
+      }
+
+      // Buscar JSON directo
+      const directJsonMatch = cleanText.match(/\{[\s\S]*\}/);
+      if (directJsonMatch) {
+        console.log('📋 Found direct JSON');
+        return JSON.parse(directJsonMatch[0].trim());
+      }
+
+      // Buscar manualmente
+      let braceCount = 0;
+      let startIndex = -1;
+      let endIndex = -1;
+
+      for (let i = 0; i < cleanText.length; i++) {
+        if (cleanText[i] === '{') {
+          if (startIndex === -1) startIndex = i;
+          braceCount++;
+        } else if (cleanText[i] === '}') {
+          braceCount--;
+          if (braceCount === 0 && startIndex !== -1) {
+            endIndex = i + 1;
+            break;
+          }
+        }
+      }
+
+      if (startIndex !== -1 && endIndex !== -1) {
+        const jsonStr = cleanText.substring(startIndex, endIndex);
+        console.log('📋 Found JSON with manual parsing');
+        return JSON.parse(jsonStr);
+      }
+
+      console.error('❌ No valid JSON found in response');
+      return null;
+
     } catch (error) {
-      console.error('Error parsing Gemini response:', error);
-      console.error('Raw response:', text);
+      console.error('❌ JSON parse error:', error);
+      console.log('📝 Text that failed to parse:', text);
       return null;
     }
   }
 
-  /**
-   * Construye la recomendación final
-   */
-  private buildRecommendation(
-    analysis: any,
-    tasks: Task[]
-  ): GeminiRecommendation | null {
-    const recommendedTask = tasks.find(t => t.id === analysis.recommendedTaskId);
+  private buildAnalysisPrompt(request: GeminiAnalysisRequest): string {
+    const { tasks } = request;
+    const currentEnergy = (request as any).currentEnergy || 'medium';
+    const currentTime = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    if (!recommendedTask) {
-      console.error('Recommended task not found:', analysis.recommendedTaskId);
+    const tasksList = tasks
+      .filter(task => task.status === 'pending')
+      .map((task, index) => {
+        const daysUntilDue = task.dueDate 
+          ? Math.floor((task.dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+          : null;
+        
+        let dueDateWarning = '';
+        if (daysUntilDue !== null) {
+          if (daysUntilDue === 0) dueDateWarning = ' ⚠️ **¡VENCE HOY!**';
+          else if (daysUntilDue < 0) dueDateWarning = ` ⚠️ **¡VENCIDA hace ${Math.abs(daysUntilDue)} días!**`;
+          else if (daysUntilDue === 1) dueDateWarning = ' ⚠️ **Vence mañana**';
+        }
+        
+        return `${index + 1}. **${task.title}**${dueDateWarning}
+   - ID: ${task.id}
+   - Categoría: ${task.category}
+   - Prioridad: ${task.priority}
+   - Tiempo: ${task.estimatedEffort} min
+   - Energía: ${task.energyRequired}
+   - Fecha: ${task.dueDate ? task.dueDate.toLocaleDateString() : 'Sin fecha'}`;
+      })
+      .join('\n\n');
+
+    return `Eres un asistente de productividad. Analiza estas tareas y recomienda UNA.
+
+CONTEXTO:
+- Hora: ${currentTime.toLocaleString('es-ES')}
+- Energía: ${currentEnergy}
+
+TAREAS:
+${tasksList}
+
+REGLAS:
+1. Si hay tareas que vencen HOY, SIEMPRE recomienda una de esas primero
+2. Considera el nivel de energía actual
+3. Prioriza urgencia e impacto
+
+Responde SOLO con este JSON (sin texto adicional):
+
+{
+  "recommendedTaskId": "ID_DE_LA_TAREA",
+  "reasoning": "Explicación de por qué esta tarea AHORA (máximo 100 palabras)",
+  "confidenceScore": 0.85,
+  "contextualFactors": [
+    {
+      "factor": "Urgencia",
+      "weight": 0.4,
+      "description": "Razón específica"
+    }
+  ],
+  "alternativeTaskIds": ["id1", "id2"],
+  "estimatedCompletionTime": 60,
+  "energyAlignment": 0.9,
+  "urgencyScore": 1.0,
+  "impactScore": 0.8
+}`;
+  }
+
+  private buildRecommendation(analysis: any, tasks: Task[]): GeminiRecommendation | null {
+    try {
+      const recommendedTask = tasks.find(t => t.id === analysis.recommendedTaskId);
+      
+      if (!recommendedTask) {
+        console.error('❌ Recommended task not found:', analysis.recommendedTaskId);
+        return null;
+      }
+
+      const alternativeTasks = (analysis.alternativeTaskIds || [])
+        .map((id: string) => tasks.find(t => t.id === id))
+        .filter((t: Task | undefined) => t !== undefined) as Task[];
+
+      return {
+        recommendedTask,
+        reasoning: analysis.reasoning || 'Recomendación generada por IA',
+        confidenceScore: analysis.confidenceScore || 0.5,
+        alternativeTasks,
+        contextualFactors: analysis.contextualFactors || [],
+        estimatedCompletionTime: analysis.estimatedCompletionTime || recommendedTask.estimatedEffort || 30,
+        energyAlignment: analysis.energyAlignment || 0.5,
+        urgencyScore: analysis.urgencyScore || 0.5,
+        impactScore: analysis.impactScore || 0.5,
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      console.error('❌ Error building recommendation:', error);
       return null;
     }
+  }
 
-    const alternativeTasks = analysis.alternativeTaskIds
-      .map((id: string) => tasks.find(t => t.id === id))
-      .filter((t: Task | undefined) => t !== undefined) as Task[];
+  private createDefaultRecommendation(tasks: Task[]): GeminiRecommendation {
+    if (tasks.length === 0) {
+      return {
+        recommendedTask: {
+          id: 'no-task',
+          title: 'No hay tareas pendientes',
+          description: 'Agrega nuevas tareas para obtener recomendaciones',
+          category: 'personal' as any,
+          priority: 'low' as any,
+          status: 'pending' as any,
+          estimatedEffort: 0,
+          energyRequired: EnergyLevel.LOW,
+          impact: 1,
+          urgency: 1,
+          personalAffinity: 1,
+          createdAt: new Date(),
+        },
+        reasoning: 'No hay tareas pendientes. Agrega nuevas tareas para obtener recomendaciones.',
+        confidenceScore: 0,
+        alternativeTasks: [],
+        contextualFactors: [],
+        estimatedCompletionTime: 0,
+        energyAlignment: 0,
+        urgencyScore: 0,
+        impactScore: 0,
+        timestamp: new Date(),
+      };
+    }
 
+    const fallbackTask = tasks[0];
     return {
-      recommendedTask,
-      reasoning: analysis.reasoning,
-      confidenceScore: analysis.confidenceScore || 0.5,
-      alternativeTasks,
-      contextualFactors: analysis.contextualFactors || [],
-      estimatedCompletionTime: analysis.estimatedCompletionTime || recommendedTask.estimatedEffort,
-      energyAlignment: analysis.energyAlignment || 0.5,
-      urgencyScore: analysis.urgencyScore || 0.5,
-      impactScore: analysis.impactScore || 0.5,
+      recommendedTask: fallbackTask,
+      reasoning: `Recomendación automática: "${fallbackTask.title}" es una tarea disponible.`,
+      confidenceScore: 0.5,
+      alternativeTasks: tasks.slice(1, 3),
+      contextualFactors: [{ factor: 'Fallback', weight: 1.0, description: 'IA no disponible' }],
+      estimatedCompletionTime: fallbackTask.estimatedEffort || 30,
+      energyAlignment: 0.5,
+      urgencyScore: 0.5,
+      impactScore: 0.5,
       timestamp: new Date(),
     };
   }
 
-  /**
-   * Genera insights del historial
-   */
-  private generateHistoryInsights(history: DecisionHistory[]): string {
-    if (history.length === 0) {
-      return 'No hay historial de decisiones previas.';
-    }
-
-    const recentDecisions = history.slice(-5);
-    const insights = recentDecisions.map((decision, index) => {
-      const followedRecommendation = decision.recommendedTask === decision.actualTaskChosen;
-      const completed = decision.wasCompleted ? 'Completada' : 'No completada';
-      
-      return `${index + 1}. ${decision.timestamp.toLocaleDateString()} - ${followedRecommendation ? 'Siguió' : 'No siguió'} recomendación - ${completed}`;
-    });
-
-    const followRate = recentDecisions.filter(d => d.recommendedTask === d.actualTaskChosen).length / recentDecisions.length;
-    const completionRate = recentDecisions.filter(d => d.wasCompleted).length / recentDecisions.length;
-
-    return `${insights.join('\n')}
-
-**Métricas:**
-- Tasa de seguimiento: ${(followRate * 100).toFixed(0)}%
-- Tasa de completado: ${(completionRate * 100).toFixed(0)}%`;
-  }
-
-  /**
-   * Formatea el perfil de energía
-   */
-  private formatEnergyProfile(profile: EnergyProfile): string {
-    const energyByTime = profile.hourlyEnergyMap
-      .sort((a, b) => a.hour - b.hour)
-      .map(entry => `${entry.hour}:00 - ${this.getEnergyEmoji(entry.energyLevel)} ${entry.energyLevel}`)
-      .join('\n');
-
-    return energyByTime;
-  }
-
-  /**
-   * Obtiene el nivel de energía actual
-   */
-  private getCurrentEnergyLevel(profile: EnergyProfile, hour: number): EnergyLevel {
-    const energyEntry = profile.hourlyEnergyMap.find(e => e.hour === hour);
-    return energyEntry?.energyLevel || EnergyLevel.MEDIUM;
-  }
-
-  /**
-   * Obtiene emoji de energía
-   */
-  private getEnergyEmoji(level: EnergyLevel): string {
-    switch (level) {
-      case EnergyLevel.HIGH:
-        return '⚡';
-      case EnergyLevel.MEDIUM:
-        return '💪';
-      case EnergyLevel.LOW:
-        return '😴';
-      default:
-        return '💪';
-    }
-  }
-
-  /**
-   * Obtiene el nombre del día
-   */
-  private getDayName(dayIndex: number): string {
-    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-    return days[dayIndex];
-  }
-
-  /**
-   * Genera un resumen de productividad
-   */
-  async generateProductivityInsights(
-    tasks: Task[],
-    history: DecisionHistory[]
-  ): Promise<string> {
+  async generateText(prompt: string): Promise<string> {
     try {
-      const completedTasks = tasks.filter(t => t.status === 'completed');
-      const prompt = `Analiza los siguientes datos de productividad y genera un resumen con insights accionables:
-
-**Tareas completadas:** ${completedTasks.length}
-**Tareas pendientes:** ${tasks.filter(t => t.status === 'pending').length}
-**Historial de decisiones:** ${history.length}
-
-Proporciona:
-1. Patrones de productividad detectados
-2. Momentos del día más productivos
-3. Categorías de tareas más completadas
-4. Recomendaciones para mejorar
-
-Responde en español, de forma clara y concisa (máximo 200 palabras).`;
-
-      const result = await this.model.generateContent(prompt);
-      return result.response.text();
-    } catch (error) {
-      console.error('Error generating insights:', error);
-      return 'No se pudieron generar insights en este momento.';
+      console.log('📝 Generating text with Gemini...');
+      return await this.callGeminiWithRetry(prompt);
+    } catch (error: any) {
+      console.error('❌ Error generating text:', error);
+      return 'Error al generar texto con IA.';
     }
   }
 }

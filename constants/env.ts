@@ -1,9 +1,8 @@
 // Configuración de variables de entorno
-// Las variables se cargan desde .env
-
-import Constants from 'expo-constants';
+// Usando EXPO_PUBLIC_ prefix para que Expo las cargue automáticamente
 
 export const ENV = {
-  GEMINI_API_KEY: process.env.GEMINI_API_KEY || Constants.expoConfig?.extra?.GEMINI_API_KEY || '',
+  // @ts-ignore - Las variables EXPO_PUBLIC_ se inyectan en tiempo de compilación
+  GEMINI_API_KEY: process.env.EXPO_PUBLIC_GEMINI_API_KEY || '',
 };
 

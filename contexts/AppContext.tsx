@@ -257,56 +257,152 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setIsLoading(true);
       const pendingTasks = tasks.filter(t => t.status === TaskStatus.PENDING);
       
+      if (pendingTasks.length === 0) {
+        setDayPlan(null);
+        return;
+      }
+
+      // Calcular días hasta vencimiento para cada tarea
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const tasksWithDueDateInfo = pendingTasks.map(task => {
+        let daysUntilDue = 999;
+        let isDueToday = false;
+        let isDueTomorrow = false;
+        let isOverdue = false;
+
+        if (task.dueDate) {
+          const due = new Date(task.dueDate);
+          due.setHours(0, 0, 0, 0);
+          daysUntilDue = Math.floor((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          isDueToday = daysUntilDue === 0;
+          isDueTomorrow = daysUntilDue === 1;
+          isOverdue = daysUntilDue < 0;
+        }
+
+        return { ...task, daysUntilDue, isDueToday, isDueTomorrow, isOverdue };
+      });
+
       // Organizar tareas por momento del día según energía y preferencias
       const morning: Task[] = [];
       const afternoon: Task[] = [];
       const evening: Task[] = [];
       
       let totalTime = 0;
+      let highEnergyCount = 0;
+      let mediumEnergyCount = 0;
+      let lowEnergyCount = 0;
+      let urgentCount = 0;
+      let dueTodayCount = 0;
 
-      // Clasificar tareas inteligentemente
-      pendingTasks.forEach(task => {
+      // Clasificar tareas inteligentemente con métricas
+      tasksWithDueDateInfo.forEach(taskInfo => {
+        const task = taskInfo as Task;
         const estimatedTime = task.estimatedEffort || 30;
         totalTime += estimatedTime;
 
-        // Tareas de alta energía requerida -> Mañana
-        if (task.energyRequired === EnergyLevel.HIGH) {
+        // Contar por nivel de energía
+        if (task.energyRequired === EnergyLevel.HIGH) highEnergyCount++;
+        else if (task.energyRequired === EnergyLevel.MEDIUM) mediumEnergyCount++;
+        else lowEnergyCount++;
+
+        // Contar urgentes
+        if (task.priority === Priority.URGENT) urgentCount++;
+        if (taskInfo.isDueToday) dueTodayCount++;
+
+        // Clasificación inteligente - LA FECHA DE HOY ES CRÍTICA
+        // 1. PRIORIDAD MÁXIMA: Tareas que vencen HOY o están vencidas
+        if (taskInfo.isDueToday || taskInfo.isOverdue) {
           morning.push(task);
         }
-        // Tareas creativas o de aprendizaje -> Tarde
+        // 2. PRIORIDAD URGENTE siempre va primero
+        else if (task.priority === Priority.URGENT) {
+          morning.push(task);
+        }
+        // 3. Tareas que vencen MAÑANA
+        else if (taskInfo.isDueTomorrow) {
+          morning.push(task);
+        }
+        // 4. Tareas de ALTA ENERGÍA en la mañana
+        else if (task.energyRequired === EnergyLevel.HIGH) {
+          morning.push(task);
+        }
+        // 5. Tareas CREATIVAS y de APRENDIZAJE en la tarde (mejor horario para concentración)
         else if (
           task.category === TaskCategory.CREATIVE ||
-          task.category === TaskCategory.LEARNING
+          task.category === TaskCategory.LEARNING ||
+          task.category === TaskCategory.WORK
         ) {
           afternoon.push(task);
         }
-        // Tareas personales o de baja energía -> Noche
+        // 6. Tareas PERSONALES, SOCIALES y de BAJA ENERGÍA en la noche
         else if (
           task.energyRequired === EnergyLevel.LOW ||
-          task.category === TaskCategory.PERSONAL
+          task.category === TaskCategory.PERSONAL ||
+          task.category === TaskCategory.SOCIAL ||
+          task.category === TaskCategory.ADMINISTRATIVE
         ) {
           evening.push(task);
         }
-        // Por defecto -> Tarde
+        // 7. Por defecto -> Tarde
         else {
           afternoon.push(task);
         }
       });
 
-      // Ordenar por prioridad dentro de cada grupo
+      // Ordenar por prioridad dentro de cada grupo (fecha de vencimiento primero)
       const sortByPriority = (a: Task, b: Task) => {
+        // PRIMERO: Ordenar por fecha de vencimiento
+        const aDaysUntilDue = tasksWithDueDateInfo.find(t => t.id === a.id)?.daysUntilDue ?? 999;
+        const bDaysUntilDue = tasksWithDueDateInfo.find(t => t.id === b.id)?.daysUntilDue ?? 999;
+        
+        if (aDaysUntilDue !== bDaysUntilDue) {
+          return aDaysUntilDue - bDaysUntilDue; // Menor días = más urgente
+        }
+
+        // SEGUNDO: Por prioridad
         const priorityValues: Record<Priority, number> = { 
           [Priority.URGENT]: 4,
           [Priority.HIGH]: 3, 
           [Priority.MEDIUM]: 2, 
           [Priority.LOW]: 1 
         };
-        return (priorityValues[b.priority] || 0) - (priorityValues[a.priority] || 0);
+        const priorityDiff = (priorityValues[b.priority] || 0) - (priorityValues[a.priority] || 0);
+        if (priorityDiff !== 0) return priorityDiff;
+        
+        // TERCERO: Por impacto
+        return b.impact - a.impact;
       };
 
       morning.sort(sortByPriority);
       afternoon.sort(sortByPriority);
       evening.sort(sortByPriority);
+
+      // Calcular tiempos por bloque
+      const morningTime = morning.reduce((sum, t) => sum + (t.estimatedEffort || 30), 0);
+      const afternoonTime = afternoon.reduce((sum, t) => sum + (t.estimatedEffort || 30), 0);
+      const eveningTime = evening.reduce((sum, t) => sum + (t.estimatedEffort || 30), 0);
+
+      // Generar razonamiento detallado y profesional
+      const reasoning = `📊 **Análisis del Plan**
+
+🎯 **Distribución Estratégica:**
+• ${morning.length} tareas matutinas (${Math.floor(morningTime / 60)}h ${morningTime % 60}min)
+• ${afternoon.length} tareas vespertinas (${Math.floor(afternoonTime / 60)}h ${afternoonTime % 60}min)  
+• ${evening.length} tareas nocturnas (${Math.floor(eveningTime / 60)}h ${eveningTime % 60}min)
+
+${dueTodayCount > 0 ? `🔴 **${dueTodayCount} tarea${dueTodayCount > 1 ? 's' : ''} vence${dueTodayCount > 1 ? 'n' : ''} HOY** - Prioridad máxima en la mañana\n` : ''}
+⚡ **Por Nivel de Energía:**
+• Alta energía: ${highEnergyCount} tareas → Asignadas a la mañana
+• Energía media: ${mediumEnergyCount} tareas → Distribuidas en tarde
+• Baja energía: ${lowEnergyCount} tareas → Programadas para la noche
+
+${urgentCount > 0 ? `🚨 **${urgentCount} tarea${urgentCount > 1 ? 's' : ''} urgente${urgentCount > 1 ? 's' : ''}** priorizadas en la mañana\n` : ''}
+💡 **Justificación:**
+La mañana es ideal para tareas urgentes y de alta energía cuando tu concentración está al máximo. La tarde aprovecha tu productividad sostenida para trabajo creativo y aprendizaje. La noche reserva tareas ligeras cuando el nivel de energía naturalmente disminuye.
+
+⏱️ **Tiempo Total:** ${Math.floor(totalTime / 60)}h ${totalTime % 60}min estimados para completar todas las tareas.`;
 
       const plan: DayPlan = {
         date: new Date(),
@@ -317,7 +413,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           afternoon,
           evening,
         },
-        reasoning: `Plan optimizado para hoy con ${pendingTasks.length} tareas (${Math.round(totalTime / 60)}h ${totalTime % 60}min estimados). Mañana: ${morning.length} tareas de alta energía. Tarde: ${afternoon.length} tareas creativas/trabajo. Noche: ${evening.length} tareas personales/ligeras.`,
+        reasoning,
       };
 
       setDayPlan(plan);

@@ -161,7 +161,7 @@ export default function HomeScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.statCard}
         >
-          <Ionicons name="list-outline" size={28} color="#FFFFFF" />
+          <Ionicons name="list-outline" size={24} color="#FFFFFF" />
           <ThemedText style={styles.statNumber}>{pendingTasks.length}</ThemedText>
           <ThemedText style={styles.statLabel}>Pendientes</ThemedText>
         </LinearGradient>
@@ -172,7 +172,7 @@ export default function HomeScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.statCard}
         >
-          <Ionicons name="checkmark-circle-outline" size={28} color="#FFFFFF" />
+          <Ionicons name="checkmark-circle-outline" size={24} color="#FFFFFF" />
           <ThemedText style={styles.statNumber}>{completedToday.length}</ThemedText>
           <ThemedText style={styles.statLabel}>Hoy</ThemedText>
         </LinearGradient>
@@ -183,7 +183,7 @@ export default function HomeScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.statCard}
         >
-          <Ionicons name={getEnergyIcon(currentEnergy)} size={28} color="#FFFFFF" />
+          <Ionicons name={getEnergyIcon(currentEnergy)} size={24} color="#FFFFFF" />
           <ThemedText style={styles.statEnergyText}>{currentEnergy.toUpperCase()}</ThemedText>
           <ThemedText style={styles.statLabel}>Energía</ThemedText>
         </LinearGradient>
@@ -226,18 +226,36 @@ export default function HomeScreen() {
           <View style={styles.dayPlanSummary}>
             <LinearGradient
               colors={['#667eea', '#764ba2']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
               style={styles.summaryGradient}
             >
-              <ThemedText style={styles.summaryText}>
-                {dayPlan.totalTasks} tareas • {Math.floor(dayPlan.estimatedTotalTime / 60)}h{' '}
-                {dayPlan.estimatedTotalTime % 60}min estimados
-              </ThemedText>
+              <View style={styles.summaryRow}>
+                <View style={styles.summaryItem}>
+                  <Ionicons name="list-outline" size={20} color="#FFFFFF" />
+                  <ThemedText style={styles.summaryLabel}>{dayPlan.totalTasks} tareas</ThemedText>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryItem}>
+                  <Ionicons name="time-outline" size={20} color="#FFFFFF" />
+                  <ThemedText style={styles.summaryLabel}>
+                    {Math.floor(dayPlan.estimatedTotalTime / 60)}h {dayPlan.estimatedTotalTime % 60}min
+                  </ThemedText>
+                </View>
+              </View>
             </LinearGradient>
           </View>
 
-          <ThemedText style={styles.dayPlanReasoning}>
-            {dayPlan.reasoning}
-          </ThemedText>
+          {/* Razonamiento detallado */}
+          <View style={styles.reasoningCard}>
+            <View style={styles.reasoningHeader}>
+              <Ionicons name="bulb" size={24} color="#fbbf24" />
+              <ThemedText style={styles.reasoningTitle}>Análisis del Plan</ThemedText>
+            </View>
+            <ThemedText style={styles.dayPlanReasoning}>
+              {dayPlan.reasoning}
+            </ThemedText>
+          </View>
 
           {/* Mañana */}
           {dayPlan.tasksByTimeSlot.morning.length > 0 && (
@@ -248,15 +266,39 @@ export default function HomeScreen() {
                   Mañana ({dayPlan.tasksByTimeSlot.morning.length} tareas)
                 </ThemedText>
               </View>
-              {dayPlan.tasksByTimeSlot.morning.slice(0, 3).map((task, index) => (
+              {dayPlan.tasksByTimeSlot.morning.slice(0, 5).map((task, index) => (
                 <View key={`morning-${task.id}`} style={styles.miniTaskCard}>
-                  <View style={styles.miniTaskNumber}>
-                    <ThemedText style={styles.miniTaskNumberText}>{index + 1}</ThemedText>
+                  <View style={styles.miniTaskHeader}>
+                    <View style={styles.miniTaskNumber}>
+                      <ThemedText style={styles.miniTaskNumberText}>{index + 1}</ThemedText>
+                    </View>
+                    <View style={styles.miniTaskContent}>
+                      <ThemedText style={styles.miniTaskTitle}>{task.title}</ThemedText>
+                      <View style={styles.miniTaskMeta}>
+                        <View style={styles.miniTaskMetaItem}>
+                          <Ionicons name="time-outline" size={14} color="#667eea" />
+                          <ThemedText style={styles.miniTaskMetaText}>
+                            {task.estimatedEffort || 30}min
+                          </ThemedText>
+                        </View>
+                        <View style={styles.miniTaskMetaItem}>
+                          <Ionicons 
+                            name={task.energyRequired === 'high' ? 'flash' : task.energyRequired === 'medium' ? 'fitness' : 'moon'} 
+                            size={14} 
+                            color="#f59e0b" 
+                          />
+                          <ThemedText style={styles.miniTaskMetaText}>
+                            {task.energyRequired}
+                          </ThemedText>
+                        </View>
+                        {task.priority === 'urgent' && (
+                          <View style={[styles.miniTaskMetaItem, styles.urgentBadge]}>
+                            <ThemedText style={styles.urgentText}>URGENTE</ThemedText>
+                          </View>
+                        )}
+                      </View>
+                    </View>
                   </View>
-                  <ThemedText style={styles.miniTaskTitle}>{task.title}</ThemedText>
-                  <ThemedText style={styles.miniTaskTime}>
-                    {task.estimatedEffort || 30}min
-                  </ThemedText>
                 </View>
               ))}
             </View>
@@ -271,15 +313,39 @@ export default function HomeScreen() {
                   Tarde ({dayPlan.tasksByTimeSlot.afternoon.length} tareas)
                 </ThemedText>
               </View>
-              {dayPlan.tasksByTimeSlot.afternoon.slice(0, 3).map((task, index) => (
+              {dayPlan.tasksByTimeSlot.afternoon.slice(0, 5).map((task, index) => (
                 <View key={`afternoon-${task.id}`} style={styles.miniTaskCard}>
-                  <View style={styles.miniTaskNumber}>
-                    <ThemedText style={styles.miniTaskNumberText}>{index + 1}</ThemedText>
+                  <View style={styles.miniTaskHeader}>
+                    <View style={styles.miniTaskNumber}>
+                      <ThemedText style={styles.miniTaskNumberText}>{index + 1}</ThemedText>
+                    </View>
+                    <View style={styles.miniTaskContent}>
+                      <ThemedText style={styles.miniTaskTitle}>{task.title}</ThemedText>
+                      <View style={styles.miniTaskMeta}>
+                        <View style={styles.miniTaskMetaItem}>
+                          <Ionicons name="time-outline" size={14} color="#f97316" />
+                          <ThemedText style={styles.miniTaskMetaText}>
+                            {task.estimatedEffort || 30}min
+                          </ThemedText>
+                        </View>
+                        <View style={styles.miniTaskMetaItem}>
+                          <Ionicons 
+                            name={task.energyRequired === 'high' ? 'flash' : task.energyRequired === 'medium' ? 'fitness' : 'moon'} 
+                            size={14} 
+                            color="#f97316" 
+                          />
+                          <ThemedText style={styles.miniTaskMetaText}>
+                            {task.energyRequired === 'high' ? 'Alta' : task.energyRequired === 'medium' ? 'Media' : 'Baja'}
+                          </ThemedText>
+                        </View>
+                        {task.priority === 'urgent' && (
+                          <View style={[styles.miniTaskMetaItem, styles.urgentBadge]}>
+                            <ThemedText style={styles.urgentText}>URGENTE</ThemedText>
+                          </View>
+                        )}
+                      </View>
+                    </View>
                   </View>
-                  <ThemedText style={styles.miniTaskTitle}>{task.title}</ThemedText>
-                  <ThemedText style={styles.miniTaskTime}>
-                    {task.estimatedEffort || 30}min
-                  </ThemedText>
                 </View>
               ))}
             </View>
@@ -294,15 +360,39 @@ export default function HomeScreen() {
                   Noche ({dayPlan.tasksByTimeSlot.evening.length} tareas)
                 </ThemedText>
               </View>
-              {dayPlan.tasksByTimeSlot.evening.slice(0, 3).map((task, index) => (
+              {dayPlan.tasksByTimeSlot.evening.slice(0, 5).map((task, index) => (
                 <View key={`evening-${task.id}`} style={styles.miniTaskCard}>
-                  <View style={styles.miniTaskNumber}>
-                    <ThemedText style={styles.miniTaskNumberText}>{index + 1}</ThemedText>
+                  <View style={styles.miniTaskHeader}>
+                    <View style={styles.miniTaskNumber}>
+                      <ThemedText style={styles.miniTaskNumberText}>{index + 1}</ThemedText>
+                    </View>
+                    <View style={styles.miniTaskContent}>
+                      <ThemedText style={styles.miniTaskTitle}>{task.title}</ThemedText>
+                      <View style={styles.miniTaskMeta}>
+                        <View style={styles.miniTaskMetaItem}>
+                          <Ionicons name="time-outline" size={14} color="#8b5cf6" />
+                          <ThemedText style={styles.miniTaskMetaText}>
+                            {task.estimatedEffort || 30}min
+                          </ThemedText>
+                        </View>
+                        <View style={styles.miniTaskMetaItem}>
+                          <Ionicons 
+                            name={task.energyRequired === 'high' ? 'flash' : task.energyRequired === 'medium' ? 'fitness' : 'moon'} 
+                            size={14} 
+                            color="#8b5cf6" 
+                          />
+                          <ThemedText style={styles.miniTaskMetaText}>
+                            {task.energyRequired === 'high' ? 'Alta' : task.energyRequired === 'medium' ? 'Media' : 'Baja'}
+                          </ThemedText>
+                        </View>
+                        {task.priority === 'urgent' && (
+                          <View style={[styles.miniTaskMetaItem, styles.urgentBadge]}>
+                            <ThemedText style={styles.urgentText}>URGENTE</ThemedText>
+                          </View>
+                        )}
+                      </View>
+                    </View>
                   </View>
-                  <ThemedText style={styles.miniTaskTitle}>{task.title}</ThemedText>
-                  <ThemedText style={styles.miniTaskTime}>
-                    {task.estimatedEffort || 30}min
-                  </ThemedText>
                 </View>
               ))}
             </View>
@@ -481,7 +571,7 @@ export default function HomeScreen() {
             </ThemedText>
             <TouchableOpacity
               style={styles.emptyAction}
-              onPress={() => Alert.alert('Próximamente', 'Ve a la pestaña Tareas para agregar')}
+              onPress={() => router.push('/(tabs)/explore')}
             >
               <LinearGradient
                 colors={['#667eea', '#764ba2']}
@@ -601,9 +691,12 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    padding: 20,
+    padding: 16,
+    paddingTop: 20,
     borderRadius: 20,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 120,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -1033,8 +1126,28 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   summaryGradient: {
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 20,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  summaryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  summaryLabel: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  summaryDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
   },
   summaryText: {
     color: '#FFFFFF',
@@ -1042,14 +1155,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  reasoningCard: {
+    marginBottom: 20,
+    padding: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
   dayPlanReasoning: {
     fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-    marginBottom: 20,
-    padding: 16,
-    backgroundColor: '#f8f9ff',
-    borderRadius: 12,
+    color: '#4b5563',
+    lineHeight: 22,
   },
   timeSlotCard: {
     marginBottom: 16,
@@ -1080,6 +1202,43 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     marginBottom: 8,
+  },
+  miniTaskHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    flex: 1,
+  },
+  miniTaskContent: {
+    flex: 1,
+  },
+  miniTaskMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+  },
+  miniTaskMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  miniTaskMetaText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  urgentBadge: {
+    backgroundColor: '#fef2f2',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+  },
+  urgentText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#ef4444',
   },
   miniTaskNumber: {
     width: 24,
