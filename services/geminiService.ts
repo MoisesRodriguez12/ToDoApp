@@ -340,6 +340,207 @@ Responde SOLO con este JSON (sin texto adicional):
       return 'Error al generar texto con IA.';
     }
   }
+
+  async generateDetailedDayPlan(tasks: Task[], energyProfile?: EnergyProfile): Promise<any> {
+    try {
+      console.log('🗓️ Generating detailed day plan with Gemini...');
+
+      if (!tasks || tasks.length === 0) {
+        return {
+          error: 'No hay tareas pendientes para planificar.',
+          suggestedActions: [
+            'Agrega nuevas tareas para crear un plan personalizado',
+            'Revisa tus objetivos diarios',
+            'Define prioridades para mañana'
+          ]
+        };
+      }
+
+      const prompt = this.buildDayPlanPrompt(tasks, energyProfile);
+      console.log('📤 Sending day plan prompt to Gemini...');
+      
+      const text = await this.callGeminiWithRetry(prompt);
+      console.log('📝 Raw day plan response:', text.substring(0, 200) + '...');
+      
+      const planData = this.parseGeminiResponse(text);
+      if (!planData) {
+        return this.createFallbackDayPlan(tasks);
+      }
+      
+      console.log('✅ Detailed day plan generated successfully');
+      return planData;
+
+    } catch (error: any) {
+      console.error('❌ Error generating detailed day plan:', error);
+      return this.createFallbackDayPlan(tasks);
+    }
+  }
+
+  private buildDayPlanPrompt(tasks: Task[], energyProfile?: EnergyProfile): string {
+    const currentTime = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Analizar tareas por urgencia
+    const tasksList = tasks
+      .filter(task => task.status === 'pending')
+      .map((task, index) => {
+        const daysUntilDue = task.dueDate 
+          ? Math.floor((task.dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+          : null;
+        
+        let dueDateWarning = '';
+        if (daysUntilDue !== null) {
+          if (daysUntilDue === 0) dueDateWarning = ' ⚠️ **¡VENCE HOY!**';
+          else if (daysUntilDue < 0) dueDateWarning = ` ⚠️ **¡VENCIDA hace ${Math.abs(daysUntilDue)} días!**`;
+          else if (daysUntilDue === 1) dueDateWarning = ' ⚠️ **Vence mañana**';
+          else if (daysUntilDue <= 3) dueDateWarning = ` ⏰ **Vence en ${daysUntilDue} días**`;
+        }
+        
+        return `${index + 1}. **${task.title}**${dueDateWarning}
+   - Categoría: ${task.category}
+   - Prioridad: ${task.priority}
+   - Tiempo estimado: ${task.estimatedEffort} minutos
+   - Energía requerida: ${task.energyRequired}
+   - Descripción: ${task.description || 'Sin descripción'}
+   - Fecha límite: ${task.dueDate ? task.dueDate.toLocaleDateString('es-ES') : 'Sin fecha límite'}`;
+      })
+      .join('\n\n');
+
+    const totalTasks = tasks.length;
+    const totalTime = tasks.reduce((sum, task) => sum + (task.estimatedEffort || 30), 0);
+
+    return `Eres un experto en productividad y planificación. Crea un plan detallado del día para las siguientes tareas.
+
+📊 **INFORMACIÓN DEL DÍA:**
+- Fecha: ${today.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+- Hora actual: ${currentTime.toLocaleTimeString('es-ES')}
+- Total de tareas: ${totalTasks}
+- Tiempo total estimado: ${Math.floor(totalTime / 60)}h ${totalTime % 60}min
+
+🎯 **TAREAS A PLANIFICAR:**
+${tasksList}
+
+📋 **INSTRUCCIONES:**
+1. Organiza las tareas en bloques de tiempo considerando:
+   - Fechas de vencimiento (MÁXIMA PRIORIDAD)
+   - Nivel de energía requerida vs horarios óptimos
+   - Flujo natural de productividad del día
+   - Tiempo para descansos entre tareas
+
+2. Incluye horarios específicos (formato 24h)
+3. Sugiere descansos de 5-15 min entre tareas
+4. Proporciona consejos específicos para cada bloque
+5. Considera patrones de energía: mañana (alta), tarde (media), noche (baja)
+
+**Responde SOLO con este JSON exacto:**
+
+{
+  "planTitle": "Plan Personalizado para Hoy",
+  "summary": {
+    "totalTasks": ${totalTasks},
+    "estimatedTime": "${Math.floor(totalTime / 60)}h ${totalTime % 60}min",
+    "urgentTasks": "número de tareas urgentes",
+    "dueTodayTasks": "número de tareas que vencen hoy"
+  },
+  "timeBlocks": [
+    {
+      "period": "Mañana",
+      "timeRange": "08:00 - 12:00",
+      "focus": "Alta energía y concentración",
+      "tasks": [
+        {
+          "taskTitle": "Título de la tarea",
+          "startTime": "08:00",
+          "endTime": "09:30",
+          "duration": "90 min",
+          "priority": "urgent/high/medium/low",
+          "reason": "Por qué se programa a esta hora",
+          "tips": "Consejos específicos para esta tarea"
+        }
+      ],
+      "breakSuggestion": "Descanso de 15 min - Tomar café y estirarse",
+      "totalBlockTime": "tiempo total del bloque"
+    }
+  ],
+  "breaks": [
+    {
+      "time": "10:30",
+      "duration": "15 min",
+      "activity": "Café y estiramiento",
+      "reason": "Mantener energía y concentración"
+    }
+  ],
+  "generalTips": [
+    "Consejo general 1",
+    "Consejo general 2",
+    "Consejo general 3"
+  ],
+  "motivationalMessage": "Mensaje motivacional personalizado",
+  "contingencyPlan": "Qué hacer si surgen interrupciones o demoras"
+}`;
+  }
+
+  private createFallbackDayPlan(tasks: Task[]): any {
+    const now = new Date();
+    const totalTime = tasks.reduce((sum, task) => sum + (task.estimatedEffort || 30), 0);
+    const urgentTasks = tasks.filter(task => task.priority === 'urgent').length;
+    
+    // Plan básico sin IA
+    const morningTasks = tasks.slice(0, Math.ceil(tasks.length / 3));
+    const afternoonTasks = tasks.slice(Math.ceil(tasks.length / 3), Math.ceil(tasks.length * 2 / 3));
+    const eveningTasks = tasks.slice(Math.ceil(tasks.length * 2 / 3));
+
+    return {
+      planTitle: "Plan Básico para Hoy",
+      summary: {
+        totalTasks: tasks.length,
+        estimatedTime: `${Math.floor(totalTime / 60)}h ${totalTime % 60}min`,
+        urgentTasks: urgentTasks,
+        dueTodayTasks: tasks.filter(task => {
+          if (!task.dueDate) return false;
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const due = new Date(task.dueDate);
+          due.setHours(0, 0, 0, 0);
+          return due.getTime() === today.getTime();
+        }).length
+      },
+      timeBlocks: [
+        {
+          period: "Mañana",
+          timeRange: "08:00 - 12:00",
+          focus: "Tareas prioritarias y de alta energía",
+          tasks: morningTasks.map((task, index) => ({
+            taskTitle: task.title,
+            startTime: `${8 + index * 1}:00`,
+            endTime: `${8 + index * 1 + 1}:30`,
+            duration: `${task.estimatedEffort || 30} min`,
+            priority: task.priority,
+            reason: "Horario de máxima productividad",
+            tips: "Mantén concentración y evita distracciones"
+          })),
+          breakSuggestion: "Descanso de 15 min - Café y estiramiento",
+          totalBlockTime: `${Math.floor(morningTasks.reduce((sum, t) => sum + (t.estimatedEffort || 30), 0) / 60)}h`
+        }
+      ],
+      breaks: [
+        {
+          time: "10:30",
+          duration: "15 min",
+          activity: "Café y estiramiento",
+          reason: "Mantener energía"
+        }
+      ],
+      generalTips: [
+        "Prioriza tareas urgentes en la mañana",
+        "Toma descansos regulares",
+        "Mantén hidratación"
+      ],
+      motivationalMessage: "¡Tienes un gran día por delante! Enfócate en una tarea a la vez.",
+      contingencyPlan: "Si surgen interrupciones, reagrupa y continúa con la siguiente tarea prioritaria."
+    };
+  }
 }
 
 export default GeminiService.getInstance();

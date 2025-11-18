@@ -257,6 +257,132 @@ export default function HomeScreen() {
             </ThemedText>
           </View>
 
+          {/* Plan Detallado de Gemini */}
+          {dayPlan.detailedPlan && (
+            <ScrollView style={styles.detailedPlanContainer} showsVerticalScrollIndicator={false}>
+              
+              {/* Bloques de tiempo detallados */}
+              {dayPlan.detailedPlan.timeBlocks.map((block, blockIndex) => (
+                <View key={blockIndex} style={styles.timeBlockCard}>
+                  <View style={styles.timeBlockHeader}>
+                    <Ionicons 
+                      name={block.period === 'Mañana' ? 'sunny-outline' : 
+                            block.period === 'Tarde' ? 'partly-sunny-outline' : 'moon-outline'} 
+                      size={24} 
+                      color={block.period === 'Mañana' ? '#f59e0b' : 
+                            block.period === 'Tarde' ? '#f97316' : '#6366f1'} 
+                    />
+                    <View style={styles.timeBlockInfo}>
+                      <ThemedText style={styles.timeBlockTitle}>{block.period}</ThemedText>
+                      <ThemedText style={styles.timeBlockRange}>{block.timeRange}</ThemedText>
+                      <ThemedText style={styles.timeBlockFocus}>{block.focus}</ThemedText>
+                    </View>
+                  </View>
+
+                  {/* Tareas del bloque */}
+                  {block.tasks.map((task, taskIndex) => (
+                    <View key={taskIndex} style={styles.detailedTaskCard}>
+                      <View style={styles.detailedTaskHeader}>
+                        <View style={styles.detailedTaskTime}>
+                          <Ionicons name="time-outline" size={16} color="#667eea" />
+                          <ThemedText style={styles.taskTimeText}>
+                            {task.startTime} - {task.endTime}
+                          </ThemedText>
+                          <View style={[styles.priorityBadge, 
+                            { backgroundColor: task.priority === 'urgent' ? '#ef4444' : 
+                                               task.priority === 'high' ? '#f97316' :
+                                               task.priority === 'medium' ? '#eab308' : '#22c55e' }]}>
+                            <ThemedText style={styles.priorityText}>{task.priority.toUpperCase()}</ThemedText>
+                          </View>
+                        </View>
+                        <ThemedText style={styles.detailedTaskTitle}>{task.taskTitle}</ThemedText>
+                      </View>
+                      
+                      <View style={styles.taskDetails}>
+                        <View style={styles.taskDetailRow}>
+                          <Ionicons name="timer-outline" size={14} color="#6b7280" />
+                          <ThemedText style={styles.taskDetailText}>Duración: {task.duration}</ThemedText>
+                        </View>
+                        <View style={styles.taskDetailRow}>
+                          <Ionicons name="information-circle-outline" size={14} color="#6b7280" />
+                          <ThemedText style={styles.taskDetailText}>Razón: {task.reason}</ThemedText>
+                        </View>
+                        {task.tips && (
+                          <View style={styles.tipsContainer}>
+                            <Ionicons name="bulb-outline" size={14} color="#fbbf24" />
+                            <ThemedText style={styles.tipText}>{task.tips}</ThemedText>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+
+                  {/* Sugerencia de descanso */}
+                  {block.breakSuggestion && (
+                    <View style={styles.breakSuggestion}>
+                      <Ionicons name="cafe-outline" size={20} color="#10b981" />
+                      <ThemedText style={styles.breakText}>{block.breakSuggestion}</ThemedText>
+                    </View>
+                  )}
+                </View>
+              ))}
+
+              {/* Descansos programados */}
+              {dayPlan.detailedPlan.breaks.length > 0 && (
+                <View style={styles.breaksSection}>
+                  <View style={styles.breaksSectionHeader}>
+                    <Ionicons name="cafe" size={24} color="#10b981" />
+                    <ThemedText style={styles.breaksSectionTitle}>Descansos Programados</ThemedText>
+                  </View>
+                  {dayPlan.detailedPlan.breaks.map((breakItem, index) => (
+                    <View key={index} style={styles.breakItem}>
+                      <View style={styles.breakTime}>
+                        <ThemedText style={styles.breakTimeText}>{breakItem.time}</ThemedText>
+                        <ThemedText style={styles.breakDuration}>({breakItem.duration})</ThemedText>
+                      </View>
+                      <View style={styles.breakContent}>
+                        <ThemedText style={styles.breakActivity}>{breakItem.activity}</ThemedText>
+                        <ThemedText style={styles.breakReason}>{breakItem.reason}</ThemedText>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Consejos generales */}
+              {dayPlan.detailedPlan.generalTips.length > 0 && (
+                <View style={styles.tipsSection}>
+                  <View style={styles.tipsSectionHeader}>
+                    <Ionicons name="bulb" size={24} color="#fbbf24" />
+                    <ThemedText style={styles.tipsSectionTitle}>Consejos para Hoy</ThemedText>
+                  </View>
+                  {dayPlan.detailedPlan.generalTips.map((tip, index) => (
+                    <View key={index} style={styles.tipItem}>
+                      <View style={styles.tipNumber}>
+                        <ThemedText style={styles.tipNumberText}>{index + 1}</ThemedText>
+                      </View>
+                      <ThemedText style={styles.tipItemText}>{tip}</ThemedText>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Plan de contingencia */}
+              {dayPlan.detailedPlan.contingencyPlan && (
+                <View style={styles.contingencySection}>
+                  <View style={styles.contingencyHeader}>
+                    <Ionicons name="shield-checkmark" size={24} color="#8b5cf6" />
+                    <ThemedText style={styles.contingencyTitle}>Plan de Contingencia</ThemedText>
+                  </View>
+                  <ThemedText style={styles.contingencyText}>
+                    {dayPlan.detailedPlan.contingencyPlan}
+                  </ThemedText>
+                </View>
+              )}
+
+            </ScrollView>
+          )}
+
           {/* Mañana */}
           {dayPlan.tasksByTimeSlot.morning.length > 0 && (
             <View style={styles.timeSlotCard}>
@@ -1264,5 +1390,265 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#667eea',
     fontWeight: '600',
+  },
+  // Estilos para el plan detallado
+  detailedPlanContainer: {
+    maxHeight: 500,
+    marginTop: 16,
+  },
+  timeBlockCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#667eea',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  timeBlockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  timeBlockInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  timeBlockTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+  },
+  timeBlockRange: {
+    fontSize: 16,
+    color: '#667eea',
+    fontWeight: '600',
+  },
+  timeBlockFocus: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontStyle: 'italic',
+  },
+  detailedTaskCard: {
+    backgroundColor: '#f8f9ff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  detailedTaskHeader: {
+    marginBottom: 10,
+  },
+  detailedTaskTime: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  taskTimeText: {
+    fontSize: 14,
+    color: '#667eea',
+    fontWeight: '600',
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginLeft: 'auto',
+  },
+  priorityText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  detailedTaskTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  taskDetails: {
+    gap: 8,
+  },
+  taskDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  taskDetailText: {
+    fontSize: 13,
+    color: '#6b7280',
+    flex: 1,
+  },
+  tipsContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#fffbeb',
+    padding: 8,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#fbbf24',
+  },
+  tipText: {
+    fontSize: 13,
+    color: '#92400e',
+    flex: 1,
+    fontStyle: 'italic',
+  },
+  breakSuggestion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ecfdf5',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 8,
+  },
+  breakText: {
+    fontSize: 14,
+    color: '#065f46',
+    flex: 1,
+  },
+  breaksSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#d1fae5',
+  },
+  breaksSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  breaksSectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginLeft: 8,
+  },
+  breakItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fdfa',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  breakTime: {
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  breakTimeText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#059669',
+  },
+  breakDuration: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  breakContent: {
+    flex: 1,
+  },
+  breakActivity: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  breakReason: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  tipsSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#fef3c7',
+  },
+  tipsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  tipsSectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginLeft: 8,
+  },
+  tipItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fffbeb',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  tipNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#fbbf24',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  tipNumberText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  tipItemText: {
+    fontSize: 14,
+    color: '#92400e',
+    flex: 1,
+    lineHeight: 20,
+  },
+  contingencySection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e9d5ff',
+  },
+  contingencyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  contingencyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginLeft: 8,
+  },
+  contingencyText: {
+    fontSize: 14,
+    color: '#6b46c1',
+    lineHeight: 20,
+    backgroundColor: '#f3f4f6',
+    padding: 12,
+    borderRadius: 8,
+  },
+  reasoningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  reasoningTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginLeft: 8,
   },
 });
