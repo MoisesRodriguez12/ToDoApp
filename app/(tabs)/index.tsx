@@ -347,7 +347,9 @@ export default function HomeScreen() {
           style={styles.statCard}
         >
           <Ionicons name={getEnergyIcon(currentEnergy)} size={24} color="#FFFFFF" />
-          <ThemedText style={styles.statEnergyText}>{currentEnergy.toUpperCase()}</ThemedText>
+          <ThemedText style={styles.statEnergyText}>
+            {currentEnergy === 'high' ? 'ALTA' : currentEnergy === 'medium' ? 'MEDIA' : 'BAJA'}
+          </ThemedText>
           <ThemedText style={styles.statLabel}>Energía</ThemedText>
         </LinearGradient>
       </Animated.View>
@@ -816,7 +818,8 @@ export default function HomeScreen() {
                   </View>
                   <ThemedText style={styles.metricLabel}>Energía</ThemedText>
                   <ThemedText style={styles.metricValue}>
-                    {currentRecommendation.recommendedTask.energyRequired}
+                    {currentRecommendation.recommendedTask.energyRequired === 'high' ? 'Alta' : 
+                     currentRecommendation.recommendedTask.energyRequired === 'medium' ? 'Media' : 'Baja'}
                   </ThemedText>
                 </View>
 

@@ -7,7 +7,11 @@ import {
   Dimensions,
   Platform,
   StatusBar,
+  Image,
+  ScrollView,
+  KeyboardAvoidingView,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -68,83 +72,61 @@ export default function LoginScreen() {
   };
 
   return (
-    <>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      <View style={styles.container}>
-        {/* Header con logo minimalista */}
-        <Animated.View 
-          style={[
-            styles.header,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }} 
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <StatusBar barStyle="light-content" backgroundColor="#0066FF" />
+      <LinearGradient
+        colors={['#0066FF', '#00C6FF']}
+        style={styles.container}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.logoContainer}>
-            <View style={styles.logoIcon}>
-              <ThemedText style={styles.logoEmoji}>✓</ThemedText>
+          {/* Logo y título centrado */}
+          <Animated.View 
+            style={[
+              styles.content,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <View style={styles.logoContainer}>
+              <Image
+                source={require('@/assets/images/logo.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+              <ThemedText 
+                style={styles.appTitle}
+                adjustsFontSizeToFit
+                numberOfLines={1}
+              >
+                TaskFlow
+              </ThemedText>
+              <ThemedText 
+                style={styles.appSubtitle}
+                adjustsFontSizeToFit
+                numberOfLines={2}
+              >
+                Tu asistente de productividad
+              </ThemedText>
             </View>
-            <ThemedText style={styles.appTitle}>TaskFlow</ThemedText>
-            <ThemedText style={styles.appSubtitle}>Gestión Inteligente</ThemedText>
-          </View>
-        </Animated.View>
+          </Animated.View>
 
-        {/* Contenido principal */}
-        <Animated.View 
-          style={[
-            styles.mainContent,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
-          <View style={styles.welcomeSection}>
-            <ThemedText style={styles.welcomeTitle}>
-              Bienvenido
-            </ThemedText>
-            <ThemedText style={styles.welcomeDescription}>
-              Organiza tu día con recomendaciones{'\n'}
-              inteligentes basadas en IA
-            </ThemedText>
-          </View>
-
-          {/* Features minimalistas */}
-          <View style={styles.featuresGrid}>
-            <View style={styles.featureItem}>
-              <View style={styles.featureIconContainer}>
-                <ThemedText style={styles.featureIcon}>🎯</ThemedText>
-              </View>
-              <ThemedText style={styles.featureTitle}>Enfoque IA</ThemedText>
-              <ThemedText style={styles.featureDesc}>Recomendaciones personalizadas</ThemedText>
-            </View>
-            
-            <View style={styles.featureItem}>
-              <View style={styles.featureIconContainer}>
-                <ThemedText style={styles.featureIcon}>⚡</ThemedText>
-              </View>
-              <ThemedText style={styles.featureTitle}>Productivo</ThemedText>
-              <ThemedText style={styles.featureDesc}>Optimiza tu energía</ThemedText>
-            </View>
-            
-            <View style={styles.featureItem}>
-              <View style={styles.featureIconContainer}>
-                <ThemedText style={styles.featureIcon}>📊</ThemedText>
-              </View>
-              <ThemedText style={styles.featureTitle}>Analytics</ThemedText>
-              <ThemedText style={styles.featureDesc}>Seguimiento de progreso</ThemedText>
-            </View>
-          </View>
-        </Animated.View>
-
-        {/* Footer con acciones */}
+        {/* Botones de acción */}
         <Animated.View 
           style={[
             styles.footer,
             {
               opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
             },
           ]}
         >
@@ -173,140 +155,76 @@ export default function LoginScreen() {
             activeOpacity={0.8}
           >
             <ThemedText style={styles.secondaryButtonText}>
-              Probar sin cuenta
+              Usar sin cuenta
             </ThemedText>
           </TouchableOpacity>
-
-          <ThemedText style={styles.legalText}>
-            Al continuar aceptas la sincronización{'\n'}
-            segura con Google Calendar
-          </ThemedText>
         </Animated.View>
-      </View>
-    </>
+        </ScrollView>
+      </LinearGradient>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
-  header: {
-    flex: 0.35,
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingVertical: Math.max(height * 0.05, 20),
+  },
+  content: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Math.max(width * 0.08, 20),
+    flex: 1,
   },
   logoContainer: {
     alignItems: 'center',
+    width: '100%',
   },
-  logoIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  logoEmoji: {
-    fontSize: 36,
-    color: '#FFFFFF',
-    fontWeight: '600',
+  logo: {
+    width: Math.min(width * 0.35, 150),
+    height: Math.min(width * 0.35, 150),
+    marginBottom: Math.max(height * 0.03, 20),
   },
   appTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#1C1C1E',
+    fontSize: Math.min(width * 0.09, 38),
+    fontWeight: '800',
+    color: '#FFFFFF',
     letterSpacing: -1,
-    marginBottom: 4,
+    marginBottom: 8,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.15)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
+    paddingHorizontal: 20,
   },
   appSubtitle: {
-    fontSize: 16,
-    color: '#8E8E93',
+    fontSize: Math.min(width * 0.042, 17),
+    color: 'rgba(255, 255, 255, 0.95)',
     fontWeight: '500',
-    letterSpacing: 0.5,
-  },
-  mainContent: {
-    flex: 0.5,
-    paddingHorizontal: 32,
-    justifyContent: 'center',
-  },
-  welcomeSection: {
-    alignItems: 'center',
-    marginBottom: 48,
-  },
-  welcomeTitle: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginBottom: 12,
-    letterSpacing: -0.5,
-  },
-  welcomeDescription: {
-    fontSize: 17,
-    color: '#8E8E93',
     textAlign: 'center',
-    lineHeight: 24,
-    fontWeight: '400',
-  },
-  featuresGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-  },
-  featureItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 8,
-  },
-  featureIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: '#F2F2F7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  featureIcon: {
-    fontSize: 24,
-  },
-  featureTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  featureDesc: {
-    fontSize: 12,
-    color: '#8E8E93',
-    textAlign: 'center',
-    lineHeight: 16,
+    paddingHorizontal: 30,
+    lineHeight: 22,
   },
   footer: {
-    flex: 0.3,
-    justifyContent: 'flex-end',
-    paddingHorizontal: 32,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    paddingHorizontal: Math.max(width * 0.08, 20),
+    paddingBottom: Platform.OS === 'ios' ? Math.max(height * 0.04, 30) : Math.max(height * 0.03, 20),
+    width: '100%',
   },
   primaryButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    paddingVertical: 16,
-    marginBottom: 12,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 2 },
+    paddingVertical: 17,
+    marginBottom: 14,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 10,
+    elevation: 6,
   },
   primaryButtonDisabled: {
     opacity: 0.6,
@@ -317,45 +235,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   googleIconContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#F1F3F4',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   googleIcon: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#007AFF',
+    color: '#0066FF',
+    includeFontPadding: false,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    color: '#0066FF',
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    includeFontPadding: false,
   },
   secondaryButton: {
     borderRadius: 16,
-    paddingVertical: 16,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-    backgroundColor: '#FAFAFA',
-    marginBottom: 20,
+    paddingVertical: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   secondaryButtonText: {
-    color: '#007AFF',
-    fontSize: 17,
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
     textAlign: 'center',
-    letterSpacing: 0.2,
-  },
-  legalText: {
-    fontSize: 13,
-    color: '#8E8E93',
-    textAlign: 'center',
-    lineHeight: 18,
-    paddingHorizontal: 16,
+    letterSpacing: 0.3,
+    includeFontPadding: false,
   },
 });

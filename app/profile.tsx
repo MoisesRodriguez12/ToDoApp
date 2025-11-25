@@ -37,6 +37,17 @@ export default function ProfileScreen() {
     'Domingo': EnergyLevel.HIGH,
   });
 
+  // Estado para energía por momento del día
+  const [energyByTime, setEnergyByTime] = useState<{
+    morning: EnergyLevel;
+    afternoon: EnergyLevel;
+    evening: EnergyLevel;
+  }>({
+    morning: EnergyLevel.HIGH,
+    afternoon: EnergyLevel.MEDIUM,
+    evening: EnergyLevel.LOW,
+  });
+
   // Estado para preferencias de categorías
   const [categoryPreferences, setCategoryPreferences] = useState<Record<TaskCategory, boolean>>({
     [TaskCategory.WORK]: true,
@@ -56,6 +67,22 @@ export default function ProfileScreen() {
           end: parseInt(workEnd) || 18,
         },
         breakDuration: parseInt(breakDuration) || 15,
+      });
+
+      // Actualizar energía por momento del día
+      const newHourlyMap = [];
+      for (let hour = 0; hour < 24; hour++) {
+        let level: EnergyLevel;
+        if (hour >= 6 && hour < 12) level = energyByTime.morning;
+        else if (hour >= 12 && hour < 18) level = energyByTime.afternoon;
+        else if (hour >= 18 && hour < 24) level = energyByTime.evening;
+        else level = EnergyLevel.LOW;
+        newHourlyMap.push({ hour, energyLevel: level });
+      }
+      
+      await updateEnergyProfile({
+        userId: user?.id || 'default',
+        hourlyEnergyMap: newHourlyMap,
       });
 
       Alert.alert('✓ Guardado', 'Tu perfil se ha actualizado correctamente');
@@ -186,32 +213,111 @@ export default function ProfileScreen() {
 
           <View style={styles.card}>
             <ThemedText style={styles.description}>
-              Tu energía varía durante el día. Configura tus momentos de mayor y menor energía.
+              Configura tu nivel de energía típico para cada momento del día
             </ThemedText>
             
-            <View style={styles.energyPreview}>
-              <View style={styles.energyItem}>
-                <Ionicons name="sunny" size={32} color="#fbbf24" />
-                <ThemedText style={styles.energyLabel}>Mañana</ThemedText>
-                <ThemedText style={styles.energyValue}>
-                  {energyProfile?.hourlyEnergyMap.filter(e => e.hour >= 6 && e.hour < 12).filter(e => e.energyLevel === EnergyLevel.HIGH).length || 0} horas alta
-                </ThemedText>
+            {/* Mañana */}
+            <View style={styles.timeOfDayRow}>
+              <View style={styles.timeOfDayHeader}>
+                <Ionicons name="sunny" size={24} color="#fbbf24" />
+                <View style={styles.timeOfDayTextContainer}>
+                  <ThemedText style={styles.timeOfDayLabel}>Mañana</ThemedText>
+                  <ThemedText style={styles.timeOfDayHours}>6am-12pm</ThemedText>
+                </View>
               </View>
-
-              <View style={styles.energyItem}>
-                <Ionicons name="partly-sunny" size={32} color="#f97316" />
-                <ThemedText style={styles.energyLabel}>Tarde</ThemedText>
-                <ThemedText style={styles.energyValue}>
-                  {energyProfile?.hourlyEnergyMap.filter(e => e.hour >= 12 && e.hour < 18).filter(e => e.energyLevel === EnergyLevel.HIGH).length || 0} horas alta
-                </ThemedText>
+              <View style={styles.energySelector}>
+                {(['low', 'medium', 'high'] as EnergyLevel[]).map((level) => {
+                  const isSelected = energyByTime.morning === level;
+                  const iconName = level === 'high' ? 'flash' : level === 'medium' ? 'fitness' : 'moon';
+                  const color = level === 'high' ? '#10b981' : level === 'medium' ? '#f59e0b' : '#8b5cf6';
+                  
+                  return (
+                    <TouchableOpacity
+                      key={level}
+                      style={[
+                        styles.energyButton,
+                        isSelected && { backgroundColor: color, borderColor: color },
+                      ]}
+                      onPress={() => setEnergyByTime(prev => ({ ...prev, morning: level }))}
+                    >
+                      <Ionicons 
+                        name={iconName} 
+                        size={20} 
+                        color={isSelected ? '#FFFFFF' : color} 
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
+            </View>
 
-              <View style={styles.energyItem}>
-                <Ionicons name="moon" size={32} color="#8b5cf6" />
-                <ThemedText style={styles.energyLabel}>Noche</ThemedText>
-                <ThemedText style={styles.energyValue}>
-                  {energyProfile?.hourlyEnergyMap.filter(e => e.hour >= 18 && e.hour < 24).filter(e => e.energyLevel === EnergyLevel.HIGH).length || 0} horas alta
-                </ThemedText>
+            {/* Tarde */}
+            <View style={styles.timeOfDayRow}>
+              <View style={styles.timeOfDayHeader}>
+                <Ionicons name="partly-sunny" size={24} color="#f97316" />
+                <View style={styles.timeOfDayTextContainer}>
+                  <ThemedText style={styles.timeOfDayLabel}>Tarde</ThemedText>
+                  <ThemedText style={styles.timeOfDayHours}>12pm-6pm</ThemedText>
+                </View>
+              </View>
+              <View style={styles.energySelector}>
+                {(['low', 'medium', 'high'] as EnergyLevel[]).map((level) => {
+                  const isSelected = energyByTime.afternoon === level;
+                  const iconName = level === 'high' ? 'flash' : level === 'medium' ? 'fitness' : 'moon';
+                  const color = level === 'high' ? '#10b981' : level === 'medium' ? '#f59e0b' : '#8b5cf6';
+                  
+                  return (
+                    <TouchableOpacity
+                      key={level}
+                      style={[
+                        styles.energyButton,
+                        isSelected && { backgroundColor: color, borderColor: color },
+                      ]}
+                      onPress={() => setEnergyByTime(prev => ({ ...prev, afternoon: level }))}
+                    >
+                      <Ionicons 
+                        name={iconName} 
+                        size={20} 
+                        color={isSelected ? '#FFFFFF' : color} 
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Noche */}
+            <View style={styles.timeOfDayRow}>
+              <View style={styles.timeOfDayHeader}>
+                <Ionicons name="moon" size={24} color="#8b5cf6" />
+                <View style={styles.timeOfDayTextContainer}>
+                  <ThemedText style={styles.timeOfDayLabel}>Noche</ThemedText>
+                  <ThemedText style={styles.timeOfDayHours}>6pm-12am</ThemedText>
+                </View>
+              </View>
+              <View style={styles.energySelector}>
+                {(['low', 'medium', 'high'] as EnergyLevel[]).map((level) => {
+                  const isSelected = energyByTime.evening === level;
+                  const iconName = level === 'high' ? 'flash' : level === 'medium' ? 'fitness' : 'moon';
+                  const color = level === 'high' ? '#10b981' : level === 'medium' ? '#f59e0b' : '#8b5cf6';
+                  
+                  return (
+                    <TouchableOpacity
+                      key={level}
+                      style={[
+                        styles.energyButton,
+                        isSelected && { backgroundColor: color, borderColor: color },
+                      ]}
+                      onPress={() => setEnergyByTime(prev => ({ ...prev, evening: level }))}
+                    >
+                      <Ionicons 
+                        name={iconName} 
+                        size={20} 
+                        color={isSelected ? '#FFFFFF' : color} 
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           </View>
@@ -243,14 +349,14 @@ export default function ProfileScreen() {
                         key={level}
                         style={[
                           styles.energyButton,
-                          isSelected && { backgroundColor: color + '20', borderColor: color }
+                          isSelected && { backgroundColor: color, borderColor: color }
                         ]}
                         onPress={() => setEnergyByDay(prev => ({ ...prev, [day]: level }))}
                       >
                         <Ionicons 
                           name={iconName} 
                           size={20} 
-                          color={isSelected ? color : '#999'} 
+                          color={isSelected ? '#FFFFFF' : '#999'} 
                         />
                       </TouchableOpacity>
                     );
@@ -338,16 +444,14 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         {/* Botón Cerrar Sesión */}
-        {user && (
-          <TouchableOpacity
-            style={styles.logoutButton}
-            onPress={handleLogout}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-            <ThemedText style={styles.logoutButtonText}>Cerrar Sesión</ThemedText>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+          <ThemedText style={styles.logoutButtonText}>Cerrar Sesión</ThemedText>
+        </TouchableOpacity>
 
         <View style={{ height: 40 }} />
       </View>
@@ -468,6 +572,27 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 20,
   },
+  timeOfDayRow: {
+    marginBottom: 16,
+  },
+  timeOfDayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  timeOfDayTextContainer: {
+    marginLeft: 8,
+  },
+  timeOfDayLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  timeOfDayHours: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 1,
+  },
   energyPreview: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -531,29 +656,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   dayLabel: {
     fontSize: 15,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#333',
-    flex: 1,
+    width: 100,
   },
   energySelector: {
     flexDirection: 'row',
     gap: 8,
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   energyButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f8f9ff',
     borderWidth: 2,
     borderColor: '#e0e0e0',
+  },
+  energyButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
   },
   categoryRow: {
     flexDirection: 'row',
