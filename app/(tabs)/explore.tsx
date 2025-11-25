@@ -8,7 +8,9 @@ import {
   Modal,
   Alert,
   Switch,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -40,6 +42,9 @@ export default function TasksScreen() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('pending');
   const [isInferring, setIsInferring] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
+  const [datePickerValue, setDatePickerValue] = useState(new Date());
   
   const [newTask, setNewTask] = useState({
     title: '',
@@ -107,17 +112,17 @@ export default function TasksScreen() {
         }
       }
       
-      const prompt = `Analiza esta tarea y devuelve un JSON con category (work/personal/learning/health/creative/administrative/social) y priority (low/medium/high/urgent):
+      const prompt = `Analiza esta tarea y devuelve un JSON con category (trabajo/personal/estudio/salud/creativo/administrativo/social) y priority (baja/media/alta/urgente):
       
 Título: ${title}
 Descripción: ${description || 'Sin descripción'}
 **FECHA DE VENCIMIENTO: ${dueDateInfo}**
 
 ⚠️ REGLAS CRÍTICAS SOBRE PRIORIDAD:
-- Si la tarea VENCE HOY o está vencida → SIEMPRE priority: "urgent"
-- Si vence mañana → priority: "high" como mínimo
-- Si vence en menos de 3 días → priority: "high" como mínimo
-- Si vence en menos de 7 días → priority: "medium" como mínimo
+- Si la tarea VENCE HOY o está vencida → SIEMPRE priority: "urgente"
+- Si vence mañana → priority: "alta" como mínimo
+- Si vence en menos de 3 días → priority: "alta" como mínimo
+- Si vence en menos de 7 días → priority: "media" como mínimo
 - La fecha de vencimiento es MÁS importante que las palabras clave
 
 Responde SOLO con JSON válido: {"category": "...", "priority": "..."}`;
@@ -262,6 +267,55 @@ Responde SOLO con JSON válido: {"category": "...", "priority": "..."}`;
     }
   };
 
+  const getPriorityLabel = (priority: Priority): string => {
+    switch (priority) {
+      case Priority.URGENT:
+        return 'Urgente';
+      case Priority.HIGH:
+        return 'Alta';
+      case Priority.MEDIUM:
+        return 'Media';
+      case Priority.LOW:
+        return 'Baja';
+      default:
+        return priority;
+    }
+  };
+
+  const getEnergyLabel = (energy: EnergyLevel): string => {
+    switch (energy) {
+      case EnergyLevel.HIGH:
+        return 'Alta';
+      case EnergyLevel.MEDIUM:
+        return 'Media';
+      case EnergyLevel.LOW:
+        return 'Baja';
+      default:
+        return energy;
+    }
+  };
+
+  const getCategoryLabel = (category: TaskCategory): string => {
+    switch (category) {
+      case TaskCategory.WORK:
+        return 'Trabajo';
+      case TaskCategory.PERSONAL:
+        return 'Personal';
+      case TaskCategory.LEARNING:
+        return 'Aprendizaje';
+      case TaskCategory.HEALTH:
+        return 'Salud';
+      case TaskCategory.CREATIVE:
+        return 'Creativo';
+      case TaskCategory.ADMINISTRATIVE:
+        return 'Administrativo';
+      case TaskCategory.SOCIAL:
+        return 'Social';
+      default:
+        return category;
+    }
+  };
+
   const getCategoryIcon = (category: TaskCategory) => {
     switch (category) {
       case TaskCategory.WORK:
@@ -402,7 +456,7 @@ Responde SOLO con JSON válido: {"category": "...", "priority": "..."}`;
                   ]}
                 >
                   <ThemedText style={styles.priorityText}>
-                    {task.priority}
+                    {getPriorityLabel(task.priority)}
                   </ThemedText>
                 </View>
               </View>
@@ -450,7 +504,7 @@ Responde SOLO con JSON válido: {"category": "...", "priority": "..."}`;
                     ⏱️ {task.estimatedEffort}min
                   </ThemedText>
                   <ThemedText style={styles.metaText}>
-                    ⚡ {task.energyRequired}
+                    ⚡ {getEnergyLabel(task.energyRequired)}
                   </ThemedText>
                   <ThemedText style={styles.metaText}>
                     🎯 {task.impact}/10
@@ -517,20 +571,8 @@ Responde SOLO con JSON válido: {"category": "...", "priority": "..."}`;
             <TouchableOpacity
               style={styles.dateButton}
               onPress={() => {
-                // Aquí usaremos un selector de fecha simple
-                const today = new Date();
-                Alert.prompt(
-                  'Fecha de vencimiento',
-                  'Días desde hoy (0 = hoy, 1 = mañana, etc.)',
-                  (text) => {
-                    const days = parseInt(text) || 0;
-                    const dueDate = new Date();
-                    dueDate.setDate(dueDate.getDate() + days);
-                    setNewTask({ ...newTask, dueDate });
-                  },
-                  'plain-text',
-                  '0'
-                );
+                setDatePickerValue(newTask.dueDate || new Date());
+                setShowDatePicker(true);
               }}
             >
               <Ionicons name="calendar-outline" size={20} color="#667eea" />
@@ -548,6 +590,20 @@ Responde SOLO con JSON válido: {"category": "...", "priority": "..."}`;
                 </TouchableOpacity>
               )}
             </TouchableOpacity>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={datePickerValue}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(Platform.OS === 'ios');
+                  if (selectedDate) {
+                    setNewTask({ ...newTask, dueDate: selectedDate });
+                  }
+                }}
+              />
+            )}
 
             <TouchableOpacity 
               style={styles.submitButton} 
@@ -621,7 +677,7 @@ Responde SOLO con JSON válido: {"category": "...", "priority": "..."}`;
                     styles.categoryChipText,
                     editTask.category === cat && styles.categoryChipTextSelected
                   ]}>
-                    {cat}
+                    {getCategoryLabel(cat)}
                   </ThemedText>
                 </TouchableOpacity>
               ))}
@@ -643,7 +699,7 @@ Responde SOLO con JSON válido: {"category": "...", "priority": "..."}`;
                     styles.priorityChipText,
                     editTask.priority === pri && { color: getPriorityColor(pri) }
                   ]}>
-                    {pri}
+                    {getPriorityLabel(pri)}
                   </ThemedText>
                 </TouchableOpacity>
               ))}
@@ -669,7 +725,7 @@ Responde SOLO con JSON válido: {"category": "...", "priority": "..."}`;
                     styles.energyChipText,
                     editTask.energyRequired === energy && styles.energyChipTextSelected
                   ]}>
-                    {energy}
+                    {getEnergyLabel(energy)}
                   </ThemedText>
                 </TouchableOpacity>
               ))}
@@ -691,18 +747,8 @@ Responde SOLO con JSON válido: {"category": "...", "priority": "..."}`;
             <TouchableOpacity
               style={styles.dateButton}
               onPress={() => {
-                Alert.prompt(
-                  'Fecha de vencimiento',
-                  'Días desde hoy (0 = hoy, 1 = mañana, -1 = ayer, etc.)',
-                  (text) => {
-                    const days = parseInt(text) || 0;
-                    const dueDate = new Date();
-                    dueDate.setDate(dueDate.getDate() + days);
-                    setEditTask({ ...editTask, dueDate });
-                  },
-                  'plain-text',
-                  editTask.dueDate ? '0' : ''
-                );
+                setDatePickerValue(editTask.dueDate ? new Date(editTask.dueDate) : new Date());
+                setShowEditDatePicker(true);
               }}
             >
               <Ionicons name="calendar-outline" size={20} color="#667eea" />
@@ -724,6 +770,20 @@ Responde SOLO con JSON válido: {"category": "...", "priority": "..."}`;
                 </TouchableOpacity>
               )}
             </TouchableOpacity>
+
+            {showEditDatePicker && (
+              <DateTimePicker
+                value={datePickerValue}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  setShowEditDatePicker(Platform.OS === 'ios');
+                  if (selectedDate) {
+                    setEditTask({ ...editTask, dueDate: selectedDate });
+                  }
+                }}
+              />
+            )}
 
             <View style={styles.sliderContainer}>
               <ThemedText style={styles.label}>Impacto: {editTask.impact}/10</ThemedText>

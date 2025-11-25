@@ -3,15 +3,12 @@ import {
   Task,
   GeminiRecommendation,
   EnergyProfile,
-  DecisionHistory,
   GeminiAnalysisRequest,
-  ContextualFactor,
   EnergyLevel,
 } from '../types';
 import { ENV } from '../constants/env';
 
 const GEMINI_API_KEY = ENV.GEMINI_API_KEY;
-const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 export class GeminiService {
   private static instance: GeminiService;
@@ -19,12 +16,8 @@ export class GeminiService {
   private model: any;
 
   private constructor() {
-    console.log('🔑 Initializing Gemini with gemini-2.5-flash...');
-    console.log('API Key length:', GEMINI_API_KEY?.length || 0);
-    
     if (!GEMINI_API_KEY || GEMINI_API_KEY.length < 20) {
-      console.error('❌ GEMINI_API_KEY is missing or invalid');
-      throw new Error('Gemini API key no configurada correctamente');
+      throw new Error('Gemini API key no configurada');
     }
     
     this.genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -32,12 +25,13 @@ export class GeminiService {
       model: 'gemini-2.5-flash',
       generationConfig: {
         temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 8192,
+      },
+      systemInstruction: {
+        role: 'system',
+        parts: [{ text: 'Responde directamente con el JSON solicitado. No uses razonamiento interno extenso.' }]
       },
     });
-    console.log('✅ Gemini service initialized successfully');
   }
 
   static getInstance(): GeminiService {
@@ -47,231 +41,30 @@ export class GeminiService {
     return GeminiService.instance;
   }
 
+  // ==================== RECOMENDACIÓN DE TAREAS ====================
+  
   async analyzeTasksAndRecommend(request: GeminiAnalysisRequest): Promise<GeminiRecommendation | null> {
     try {
-      console.log('🤖 Starting task analysis with Gemini...');
-
       if (!request.tasks || request.tasks.length === 0) {
-        console.log('📭 No tasks to analyze');
         return null;
       }
 
-      const prompt = this.buildAnalysisPrompt(request);
-      console.log('📤 Sending prompt to Gemini...');
+      const prompt = this.buildRecommendationPrompt(request);
+      const response = await this.callGemini(prompt);
+      const analysis = this.parseJSON(response);
       
-      const text = await this.callGeminiWithRetry(prompt);
-      console.log('📝 Raw Gemini response:', text);
-      
-      const analysis = this.parseGeminiResponse(text);
-      if (!analysis) {
-        console.log('❌ Failed to parse response, returning default');
-        return this.createDefaultRecommendation(request.tasks);
-      }
-      
-      const recommendation = this.buildRecommendation(analysis, request.tasks);
-      if (!recommendation) {
-        console.log('❌ Failed to build recommendation, returning default');
-        return this.createDefaultRecommendation(request.tasks);
-      }
-      
-      console.log('✅ Analysis completed successfully');
-      return recommendation;
-
-    } catch (error: any) {
-      console.error('❌ Error analyzing tasks with Gemini:', error);
-      return this.createDefaultRecommendation(request.tasks || []);
-    }
-  }
-
-  private async callGeminiWithRetry(prompt: string, retries: number = 2): Promise<string> {
-    for (let i = 0; i < retries; i++) {
-      try {
-        console.log(`🔄 Attempt ${i + 1}/${retries}`);
-        
-        try {
-          const result = await this.model.generateContent(prompt);
-          const text = result.response.text();
-          console.log('✅ SDK response received');
-          return text;
-        } catch (sdkError: any) {
-          console.log('⚠️ SDK failed, trying direct REST API...');
-          
-          const response = await fetch(
-            `${API_URL}/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                  temperature: 0.7,
-                  topK: 40,
-                  topP: 0.95,
-                  maxOutputTokens: 2048,
-                }
-              })
-            }
-          );
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            console.error('❌ REST API error:', response.status, errorData);
-            throw new Error(`API Error ${response.status}`);
-          }
-
-          const data = await response.json();
-          console.log('✅ REST API response received');
-          
-          const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (!content) throw new Error('No text content in API response');
-          
-          return content;
-        }
-      } catch (error: any) {
-        console.error(`❌ Attempt ${i + 1} failed:`, error.message);
-        if (i === retries - 1) throw error;
-        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-      }
-    }
-    throw new Error('All retry attempts failed');
-  }
-
-  private parseGeminiResponse(text: string): any {
-    console.log('🔍 Parsing Gemini response...');
-    
-    try {
-      let cleanText = text.trim();
-      
-      // Buscar JSON en bloques de código
-      const codeBlockMatch = cleanText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-      if (codeBlockMatch) {
-        console.log('📋 Found JSON in code block');
-        return JSON.parse(codeBlockMatch[1].trim());
-      }
-
-      // Buscar JSON directo
-      const directJsonMatch = cleanText.match(/\{[\s\S]*\}/);
-      if (directJsonMatch) {
-        console.log('📋 Found direct JSON');
-        return JSON.parse(directJsonMatch[0].trim());
-      }
-
-      // Buscar manualmente
-      let braceCount = 0;
-      let startIndex = -1;
-      let endIndex = -1;
-
-      for (let i = 0; i < cleanText.length; i++) {
-        if (cleanText[i] === '{') {
-          if (startIndex === -1) startIndex = i;
-          braceCount++;
-        } else if (cleanText[i] === '}') {
-          braceCount--;
-          if (braceCount === 0 && startIndex !== -1) {
-            endIndex = i + 1;
-            break;
-          }
-        }
-      }
-
-      if (startIndex !== -1 && endIndex !== -1) {
-        const jsonStr = cleanText.substring(startIndex, endIndex);
-        console.log('📋 Found JSON with manual parsing');
-        return JSON.parse(jsonStr);
-      }
-
-      console.error('❌ No valid JSON found in response');
-      return null;
-
-    } catch (error) {
-      console.error('❌ JSON parse error:', error);
-      console.log('📝 Text that failed to parse:', text);
-      return null;
-    }
-  }
-
-  private buildAnalysisPrompt(request: GeminiAnalysisRequest): string {
-    const { tasks } = request;
-    const currentEnergy = (request as any).currentEnergy || 'medium';
-    const currentTime = new Date();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const tasksList = tasks
-      .filter(task => task.status === 'pending')
-      .map((task, index) => {
-        const daysUntilDue = task.dueDate 
-          ? Math.floor((task.dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-          : null;
-        
-        let dueDateWarning = '';
-        if (daysUntilDue !== null) {
-          if (daysUntilDue === 0) dueDateWarning = ' ⚠️ **¡VENCE HOY!**';
-          else if (daysUntilDue < 0) dueDateWarning = ` ⚠️ **¡VENCIDA hace ${Math.abs(daysUntilDue)} días!**`;
-          else if (daysUntilDue === 1) dueDateWarning = ' ⚠️ **Vence mañana**';
-        }
-        
-        return `${index + 1}. **${task.title}**${dueDateWarning}
-   - ID: ${task.id}
-   - Categoría: ${task.category}
-   - Prioridad: ${task.priority}
-   - Tiempo: ${task.estimatedEffort} min
-   - Energía: ${task.energyRequired}
-   - Fecha: ${task.dueDate ? task.dueDate.toLocaleDateString() : 'Sin fecha'}`;
-      })
-      .join('\n\n');
-
-    return `Eres un asistente de productividad. Analiza estas tareas y recomienda UNA.
-
-CONTEXTO:
-- Hora: ${currentTime.toLocaleString('es-ES')}
-- Energía: ${currentEnergy}
-
-TAREAS:
-${tasksList}
-
-REGLAS:
-1. Si hay tareas que vencen HOY, SIEMPRE recomienda una de esas primero
-2. Considera el nivel de energía actual
-3. Prioriza urgencia e impacto
-
-Responde SOLO con este JSON (sin texto adicional):
-
-{
-  "recommendedTaskId": "ID_DE_LA_TAREA",
-  "reasoning": "Explicación de por qué esta tarea AHORA (máximo 100 palabras)",
-  "confidenceScore": 0.85,
-  "contextualFactors": [
-    {
-      "factor": "Urgencia",
-      "weight": 0.4,
-      "description": "Razón específica"
-    }
-  ],
-  "alternativeTaskIds": ["id1", "id2"],
-  "estimatedCompletionTime": 60,
-  "energyAlignment": 0.9,
-  "urgencyScore": 1.0,
-  "impactScore": 0.8
-}`;
-  }
-
-  private buildRecommendation(analysis: any, tasks: Task[]): GeminiRecommendation | null {
-    try {
-      const recommendedTask = tasks.find(t => t.id === analysis.recommendedTaskId);
-      
+      const recommendedTask = request.tasks.find(t => t.id === analysis.recommendedTaskId);
       if (!recommendedTask) {
-        console.error('❌ Recommended task not found:', analysis.recommendedTaskId);
-        return null;
+        throw new Error(`Tarea no encontrada: ${analysis.recommendedTaskId}`);
       }
 
       const alternativeTasks = (analysis.alternativeTaskIds || [])
-        .map((id: string) => tasks.find(t => t.id === id))
-        .filter((t: Task | undefined) => t !== undefined) as Task[];
+        .map((id: string) => request.tasks.find(t => t.id === id))
+        .filter(Boolean) as Task[];
 
       return {
         recommendedTask,
-        reasoning: analysis.reasoning || 'Recomendación generada por IA',
+        reasoning: analysis.reasoning || 'Recomendación generada',
         confidenceScore: analysis.confidenceScore || 0.5,
         alternativeTasks,
         contextualFactors: analysis.contextualFactors || [],
@@ -281,107 +74,19 @@ Responde SOLO con este JSON (sin texto adicional):
         impactScore: analysis.impactScore || 0.5,
         timestamp: new Date(),
       };
-    } catch (error) {
-      console.error('❌ Error building recommendation:', error);
+
+    } catch (error: any) {
+      console.error('❌ Error en recomendación:', error.message);
       return null;
     }
   }
 
-  private createDefaultRecommendation(tasks: Task[]): GeminiRecommendation {
-    if (tasks.length === 0) {
-      return {
-        recommendedTask: {
-          id: 'no-task',
-          title: 'No hay tareas pendientes',
-          description: 'Agrega nuevas tareas para obtener recomendaciones',
-          category: 'personal' as any,
-          priority: 'low' as any,
-          status: 'pending' as any,
-          estimatedEffort: 0,
-          energyRequired: EnergyLevel.LOW,
-          impact: 1,
-          urgency: 1,
-          personalAffinity: 1,
-          createdAt: new Date(),
-        },
-        reasoning: 'No hay tareas pendientes. Agrega nuevas tareas para obtener recomendaciones.',
-        confidenceScore: 0,
-        alternativeTasks: [],
-        contextualFactors: [],
-        estimatedCompletionTime: 0,
-        energyAlignment: 0,
-        urgencyScore: 0,
-        impactScore: 0,
-        timestamp: new Date(),
-      };
-    }
-
-    const fallbackTask = tasks[0];
-    return {
-      recommendedTask: fallbackTask,
-      reasoning: `Recomendación automática: "${fallbackTask.title}" es una tarea disponible.`,
-      confidenceScore: 0.5,
-      alternativeTasks: tasks.slice(1, 3),
-      contextualFactors: [{ factor: 'Fallback', weight: 1.0, description: 'IA no disponible' }],
-      estimatedCompletionTime: fallbackTask.estimatedEffort || 30,
-      energyAlignment: 0.5,
-      urgencyScore: 0.5,
-      impactScore: 0.5,
-      timestamp: new Date(),
-    };
-  }
-
-  async generateText(prompt: string): Promise<string> {
-    try {
-      console.log('📝 Generating text with Gemini...');
-      return await this.callGeminiWithRetry(prompt);
-    } catch (error: any) {
-      console.error('❌ Error generating text:', error);
-      return 'Error al generar texto con IA.';
-    }
-  }
-
-  async generateDetailedDayPlan(tasks: Task[], energyProfile?: EnergyProfile): Promise<any> {
-    try {
-      console.log('🗓️ Generating detailed day plan with Gemini...');
-
-      if (!tasks || tasks.length === 0) {
-        return {
-          error: 'No hay tareas pendientes para planificar.',
-          suggestedActions: [
-            'Agrega nuevas tareas para crear un plan personalizado',
-            'Revisa tus objetivos diarios',
-            'Define prioridades para mañana'
-          ]
-        };
-      }
-
-      const prompt = this.buildDayPlanPrompt(tasks, energyProfile);
-      console.log('📤 Sending day plan prompt to Gemini...');
-      
-      const text = await this.callGeminiWithRetry(prompt);
-      console.log('📝 Raw day plan response:', text.substring(0, 200) + '...');
-      
-      const planData = this.parseGeminiResponse(text);
-      if (!planData) {
-        return this.createFallbackDayPlan(tasks);
-      }
-      
-      console.log('✅ Detailed day plan generated successfully');
-      return planData;
-
-    } catch (error: any) {
-      console.error('❌ Error generating detailed day plan:', error);
-      return this.createFallbackDayPlan(tasks);
-    }
-  }
-
-  private buildDayPlanPrompt(tasks: Task[], energyProfile?: EnergyProfile): string {
-    const currentTime = new Date();
+  private buildRecommendationPrompt(request: GeminiAnalysisRequest): string {
+    const { tasks } = request;
+    const currentEnergy = (request as any).currentEnergy || 'medium';
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Analizar tareas por urgencia
     const tasksList = tasks
       .filter(task => task.status === 'pending')
       .map((task, index) => {
@@ -389,157 +94,301 @@ Responde SOLO con este JSON (sin texto adicional):
           ? Math.floor((task.dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
           : null;
         
-        let dueDateWarning = '';
+        let urgencyTag = '';
         if (daysUntilDue !== null) {
-          if (daysUntilDue === 0) dueDateWarning = ' ⚠️ **¡VENCE HOY!**';
-          else if (daysUntilDue < 0) dueDateWarning = ` ⚠️ **¡VENCIDA hace ${Math.abs(daysUntilDue)} días!**`;
-          else if (daysUntilDue === 1) dueDateWarning = ' ⚠️ **Vence mañana**';
-          else if (daysUntilDue <= 3) dueDateWarning = ` ⏰ **Vence en ${daysUntilDue} días**`;
+          if (daysUntilDue <= 0) urgencyTag = ' ⚠️ URGENTE';
+          else if (daysUntilDue === 1) urgencyTag = ' ⏰ Mañana';
         }
         
-        return `${index + 1}. **${task.title}**${dueDateWarning}
-   - Categoría: ${task.category}
-   - Prioridad: ${task.priority}
-   - Tiempo estimado: ${task.estimatedEffort} minutos
-   - Energía requerida: ${task.energyRequired}
-   - Descripción: ${task.description || 'Sin descripción'}
-   - Fecha límite: ${task.dueDate ? task.dueDate.toLocaleDateString('es-ES') : 'Sin fecha límite'}`;
+        return `${index + 1}. "${task.title}"${urgencyTag}
+   ID: ${task.id}
+   Tiempo: ${task.estimatedEffort}min | Prioridad: ${task.priority}`;
       })
       .join('\n\n');
 
-    const totalTasks = tasks.length;
-    const totalTime = tasks.reduce((sum, task) => sum + (task.estimatedEffort || 30), 0);
+    return `Recomienda UNA tarea de esta lista.
 
-    return `Eres un experto en productividad y planificación. Crea un plan detallado del día para las siguientes tareas.
-
-📊 **INFORMACIÓN DEL DÍA:**
-- Fecha: ${today.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-- Hora actual: ${currentTime.toLocaleTimeString('es-ES')}
-- Total de tareas: ${totalTasks}
-- Tiempo total estimado: ${Math.floor(totalTime / 60)}h ${totalTime % 60}min
-
-🎯 **TAREAS A PLANIFICAR:**
 ${tasksList}
 
-📋 **INSTRUCCIONES:**
-1. Organiza las tareas en bloques de tiempo considerando:
-   - Fechas de vencimiento (MÁXIMA PRIORIDAD)
-   - Nivel de energía requerida vs horarios óptimos
-   - Flujo natural de productividad del día
-   - Tiempo para descansos entre tareas
+Contexto:
+- Hora: ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+- Energía usuario: ${currentEnergy}
 
-2. Incluye horarios específicos (formato 24h)
-3. Sugiere descansos de 5-15 min entre tareas
-4. Proporciona consejos específicos para cada bloque
-5. Considera patrones de energía: mañana (alta), tarde (media), noche (baja)
+**IMPORTANTE**: Responde ÚNICAMENTE en ESPAÑOL. Todo el contenido debe estar en español.
 
-**Responde SOLO con este JSON exacto:**
-
+Responde JSON puro (sin markdown):
 {
-  "planTitle": "Plan Personalizado para Hoy",
-  "summary": {
-    "totalTasks": ${totalTasks},
-    "estimatedTime": "${Math.floor(totalTime / 60)}h ${totalTime % 60}min",
-    "urgentTasks": "número de tareas urgentes",
-    "dueTodayTasks": "número de tareas que vencen hoy"
-  },
-  "timeBlocks": [
-    {
-      "period": "Mañana",
-      "timeRange": "08:00 - 12:00",
-      "focus": "Alta energía y concentración",
-      "tasks": [
-        {
-          "taskTitle": "Título de la tarea",
-          "startTime": "08:00",
-          "endTime": "09:30",
-          "duration": "90 min",
-          "priority": "urgent/high/medium/low",
-          "reason": "Por qué se programa a esta hora",
-          "tips": "Consejos específicos para esta tarea"
-        }
-      ],
-      "breakSuggestion": "Descanso de 15 min - Tomar café y estirarse",
-      "totalBlockTime": "tiempo total del bloque"
-    }
+  "recommendedTaskId": "ID_EXACTO_DE_LA_LISTA",
+  "reasoning": "Por qué esta tarea ahora",
+  "confidenceScore": 0.85,
+  "contextualFactors": [
+    {"factor": "Urgencia", "weight": 0.4, "description": "Razón"}
   ],
-  "breaks": [
-    {
-      "time": "10:30",
-      "duration": "15 min",
-      "activity": "Café y estiramiento",
-      "reason": "Mantener energía y concentración"
-    }
-  ],
-  "generalTips": [
-    "Consejo general 1",
-    "Consejo general 2",
-    "Consejo general 3"
-  ],
-  "motivationalMessage": "Mensaje motivacional personalizado",
-  "contingencyPlan": "Qué hacer si surgen interrupciones o demoras"
+  "alternativeTaskIds": [],
+  "estimatedCompletionTime": 60,
+  "energyAlignment": 0.9,
+  "urgencyScore": 1.0,
+  "impactScore": 0.8
 }`;
   }
 
-  private createFallbackDayPlan(tasks: Task[]): any {
-    const now = new Date();
-    const totalTime = tasks.reduce((sum, task) => sum + (task.estimatedEffort || 30), 0);
-    const urgentTasks = tasks.filter(task => task.priority === 'urgent').length;
+  // ==================== PLAN DEL DÍA ====================
+  
+  async generateDetailedDayPlan(tasks: Task[], energyProfile?: EnergyProfile, retryCount: number = 0): Promise<any> {
+    const MAX_RETRIES = 2;
     
-    // Plan básico sin IA
-    const morningTasks = tasks.slice(0, Math.ceil(tasks.length / 3));
-    const afternoonTasks = tasks.slice(Math.ceil(tasks.length / 3), Math.ceil(tasks.length * 2 / 3));
-    const eveningTasks = tasks.slice(Math.ceil(tasks.length * 2 / 3));
+    try {
+      if (!tasks || tasks.length === 0) {
+        return null;
+      }
 
-    return {
-      planTitle: "Plan Básico para Hoy",
-      summary: {
-        totalTasks: tasks.length,
-        estimatedTime: `${Math.floor(totalTime / 60)}h ${totalTime % 60}min`,
-        urgentTasks: urgentTasks,
-        dueTodayTasks: tasks.filter(task => {
-          if (!task.dueDate) return false;
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const due = new Date(task.dueDate);
-          due.setHours(0, 0, 0, 0);
-          return due.getTime() === today.getTime();
-        }).length
-      },
-      timeBlocks: [
-        {
-          period: "Mañana",
-          timeRange: "08:00 - 12:00",
-          focus: "Tareas prioritarias y de alta energía",
-          tasks: morningTasks.map((task, index) => ({
-            taskTitle: task.title,
-            startTime: `${8 + index * 1}:00`,
-            endTime: `${8 + index * 1 + 1}:30`,
-            duration: `${task.estimatedEffort || 30} min`,
-            priority: task.priority,
-            reason: "Horario de máxima productividad",
-            tips: "Mantén concentración y evita distracciones"
-          })),
-          breakSuggestion: "Descanso de 15 min - Café y estiramiento",
-          totalBlockTime: `${Math.floor(morningTasks.reduce((sum, t) => sum + (t.estimatedEffort || 30), 0) / 60)}h`
+      const prompt = this.buildDayPlanPrompt(tasks);
+      console.log('📤 PROMPT ENVIADO A GEMINI:');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log(prompt.substring(0, 500) + '...');
+      console.log('═══════════════════════════════════════════════════════');
+      
+      const response = await this.callGemini(prompt);
+      
+      console.log('📥 RESPUESTA COMPLETA DE GEMINI:');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log(response);
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('📏 Longitud de respuesta:', response.length, 'caracteres');
+      
+      // Detectar si la respuesta está truncada
+      if (!response.trim().endsWith('}') && !response.trim().endsWith(']')) {
+        console.error('⚠️ Respuesta truncada de Gemini - No termina con } o ]');
+        console.error('Últimos 100 caracteres:', response.slice(-100));
+        throw new Error('Respuesta incompleta de Gemini');
+      }
+      
+      const plan = this.parseJSON(response);
+      
+      console.log('✅ PLAN PARSEADO:');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log(JSON.stringify(plan, null, 2));
+      console.log('═══════════════════════════════════════════════════════');
+      
+      if (plan?.detailedPlan?.timeBlocks) {
+        console.log(`📊 Bloques de tiempo: ${plan.detailedPlan.timeBlocks.length}`);
+        plan.detailedPlan.timeBlocks.forEach((block: any, i: number) => {
+          console.log(`  ${i + 1}. ${block.startTime || '??'} - ${block.endTime || '??'}: ${block.taskTitle || block.task || '??'}`);
+          console.log(`     Tipo: ${block.taskType || 'N/A'}`);
+          console.log(`     WhyNow: ${block.whyNow || 'N/A'}`);
+        });
+      }
+      
+      if (plan?.detailedPlan?.breaks) {
+        console.log(`☕ Descansos: ${plan.detailedPlan.breaks.length}`);
+        plan.detailedPlan.breaks.forEach((breakItem: any, i: number) => {
+          console.log(`  ${i + 1}. ${breakItem.time}: ${breakItem.duration}min - ${breakItem.type || 'break'}`);
+        });
+      }
+      
+      if (plan?.detailedPlan?.productivityTips) {
+        console.log(`💡 Consejos: ${plan.detailedPlan.productivityTips.length}`);
+      }
+      
+      return plan;
+
+    } catch (error: any) {
+      // Retry on truncation error
+      if (error.message.includes('Respuesta incompleta') && retryCount < MAX_RETRIES) {
+        console.warn(`🔄 Reintentando (${retryCount + 1}/${MAX_RETRIES})...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+        return this.generateDetailedDayPlan(tasks, energyProfile, retryCount + 1);
+      }
+      
+      console.error('❌ Error generando plan:', error.message);
+      console.error('Stack:', error.stack);
+      return null;
+    }
+  }
+
+  private buildDayPlanPrompt(tasks: Task[]): string {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tasksList = tasks
+      .filter(task => task.status === 'pending')
+      .map((task, index) => {
+        const daysUntilDue = task.dueDate 
+          ? Math.floor((task.dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+          : null;
+        
+        let urgency = 'normal';
+        if (daysUntilDue !== null) {
+          if (daysUntilDue <= 0) urgency = 'URGENTE';
+          else if (daysUntilDue === 1) urgency = 'alta';
+          else if (daysUntilDue <= 3) urgency = 'media';
         }
-      ],
-      breaks: [
-        {
-          time: "10:30",
-          duration: "15 min",
-          activity: "Café y estiramiento",
-          reason: "Mantener energía"
+        
+        const desc = task.description ? `\n   Descripción: ${task.description}` : '';
+        return `${index + 1}. "${task.title}"${desc}
+   [Duración: ${task.estimatedEffort}min | Prioridad: ${task.priority} | Urgencia: ${urgency} | Categoría: ${task.category} | Energía: ${task.energyRequired}]`;
+      })
+      .join('\n\n');
+
+    const hora = new Date().getHours();
+    const momento = hora < 12 ? 'mañana' : hora < 18 ? 'tarde' : 'noche';
+    const horaActual = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    
+    return `Eres un experto en productividad y gestión del tiempo. Crea un PLAN DEL DÍA DETALLADO Y ÚTIL en ESPAÑOL.
+
+═══════════════════════════════════════════════════════
+📋 TAREAS PENDIENTES:
+═══════════════════════════════════════════════════════
+${tasksList}
+
+⏰ CONTEXTO:
+- Momento: ${momento}
+- Hora actual: ${horaActual}
+- Total tareas: ${tasks.filter(t => t.status === 'pending').length}
+
+═══════════════════════════════════════════════════════
+🎯 INSTRUCCIONES (SER CONCISO):
+═══════════════════════════════════════════════════════
+
+1️⃣ ORDEN: URGENTE primero, luego por energía
+2️⃣ TIEMPOS: Desde ${horaActual} + buffer 20%
+3️⃣ DESCRIPTION: MAX 2 líneas → Pasos + Técnica + Objetivo
+4️⃣ TIPS: 3 consejos de 1 línea (Pomodoro, descansos, enfoque)
+
+═══════════════════════════════════════════════════════
+📝 FORMATO JSON (SIN MARKDOWN \`\`\`json):
+═══════════════════════════════════════════════════════
+
+{
+  "planTitle": "Plan del Día",
+  "reasoning": "Orden por urgencia. Descansos para mantener energía.",
+  "detailedPlan": {
+    "timeBlocks": [
+      {
+        "startTime": "${horaActual}",
+        "endTime": "10:30",
+        "taskTitle": "Nombre EXACTO de la tarea",
+        "taskType": "mental-rutinaria",
+        "description": "Pasos: 1) Revisar. 2) Ejecutar. 3) Validar. Técnica: Pomodoro. Objetivo: Completar tarea.",
+        "whyNow": "Urgencia alta"
+      }
+    ],
+    "breaks": [
+      {
+        "time": "10:25",
+        "duration": 10,
+        "type": "micro-break",
+        "suggestion": "Caminar 3min + estirar + agua"
+      }
+    ],
+    "productivityTips": [
+      "🎯 Pomodoro 25+5: Timer + modo avión",
+      "💤 Cada 60min: Estirar + respirar",
+      "⚡ Enfoque: Celular lejos"
+    ]
+  }
+}
+
+⚠️ IMPORTANTE:
+- Incluir TODAS las tareas en timeBlocks
+- MAX: description 2 líneas, reasoning 2 líneas, tips 3 de 1 línea, whyNow 1 línea
+- Responder SOLO JSON (sin \`\`\`json)`;
+  }
+
+  // ==================== UTILIDADES ====================
+  
+  private async callGemini(prompt: string): Promise<string> {
+    try {
+      console.log('🔄 Llamando a Gemini API...');
+      const result = await this.model.generateContent(prompt);
+      console.log('✅ Respuesta recibida de Gemini');
+      console.log('📦 Result object:', JSON.stringify(result, null, 2));
+      
+      const response = result.response;
+      console.log('📄 Response object:', JSON.stringify(response, null, 2));
+      
+      // Intentar extraer texto de diferentes formas
+      let text = '';
+      
+      try {
+        text = response.text();
+      } catch (textError) {
+        console.warn('⚠️ response.text() falló, intentando extracción manual');
+        
+        // Intentar extraer manualmente de candidates
+        if (response.candidates?.[0]?.content?.parts?.[0]?.text) {
+          text = response.candidates[0].content.parts[0].text;
+        } else if (response.candidates?.[0]?.content?.parts) {
+          // Concatenar todos los parts
+          text = response.candidates[0].content.parts
+            .map((part: any) => part.text || '')
+            .join('');
         }
-      ],
-      generalTips: [
-        "Prioriza tareas urgentes en la mañana",
-        "Toma descansos regulares",
-        "Mantén hidratación"
-      ],
-      motivationalMessage: "¡Tienes un gran día por delante! Enfócate en una tarea a la vez.",
-      contingencyPlan: "Si surgen interrupciones, reagrupa y continúa con la siguiente tarea prioritaria."
-    };
+      }
+      
+      console.log('📝 Text extracted:', text?.substring(0, 200));
+      
+      if (!text || text.trim().length === 0) {
+        console.error('❌ Gemini devolvió texto vacío');
+        console.error('📊 Response completo:', JSON.stringify(response, null, 2));
+        console.error('🔍 Candidates:', response.candidates?.[0]);
+        console.error('🔍 Parts:', response.candidates?.[0]?.content?.parts);
+        throw new Error('Gemini devolvió una respuesta vacía - posiblemente todos los tokens se usaron en thinking');
+      }
+      
+      return text;
+    } catch (error: any) {
+      console.error('❌ Error en callGemini:', error);
+      console.error('📋 Error message:', error.message);
+      console.error('📋 Error stack:', error.stack);
+      throw new Error(`Gemini API error: ${error.message}`);
+    }
+  }
+
+  private parseJSON(text: string): any {
+    try {
+      let cleanText = text.trim();
+      
+      // Extraer de bloques markdown
+      if (cleanText.includes('```')) {
+        const match = /```(?:json)?\s*([\s\S]*?)```/i.exec(cleanText);
+        if (match && match[1]) {
+          cleanText = match[1].trim();
+        }
+      }
+      
+      // Limpiar antes y después del JSON
+      const firstBrace = cleanText.indexOf('{');
+      const lastBrace = cleanText.lastIndexOf('}');
+      
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        cleanText = cleanText.substring(firstBrace, lastBrace + 1);
+      }
+
+      const parsed = JSON.parse(cleanText);
+      return parsed;
+
+    } catch (error) {
+      // Si el JSON está truncado, intentar repararlo
+      if (error instanceof SyntaxError && text.includes('{')) {
+        console.error('⚠️ Respuesta truncada de Gemini');
+        console.error('📄 Respuesta parcial:', text);
+        throw new Error('Respuesta incompleta de Gemini - intenta de nuevo');
+      }
+      
+      console.error('❌ Error parseando JSON:', error instanceof Error ? error.message : 'Unknown');
+      console.error('📄 Respuesta:', text.substring(0, 500));
+      throw error;
+    }
+  }
+
+  async generateText(prompt: string): Promise<string> {
+    try {
+      return await this.callGemini(prompt);
+    } catch (error: any) {
+      console.error('❌ Error generando texto:', error.message);
+      return 'Error al generar texto.';
+    }
   }
 }
 

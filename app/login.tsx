@@ -6,13 +6,13 @@ import {
   Animated,
   Dimensions,
   Platform,
+  StatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useApp } from '@/contexts/AppContext';
 import GoogleAuthService from '@/services/googleAuthService';
-import { LinearGradient } from 'expo-linear-gradient';
 
 const { width, height } = Dimensions.get('window');
 
@@ -22,21 +22,20 @@ export default function LoginScreen() {
   const { request, response, promptAsync } = GoogleAuthService.useGoogleAuth();
   
   const [fadeAnim] = useState(new Animated.Value(0));
-  const [scaleAnim] = useState(new Animated.Value(0.8));
+  const [slideAnim] = useState(new Animated.Value(50));
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Animación de entrada
+    // Animación de entrada suave
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 1000,
+        duration: 800,
         useNativeDriver: true,
       }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 8,
-        tension: 40,
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
         useNativeDriver: true,
       }),
     ]).start();
@@ -69,275 +68,294 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Fondo con gradiente */}
-      <LinearGradient
-        colors={['#667eea', '#764ba2', '#f093fb']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
-
-      {/* Círculos decorativos animados */}
-      <View style={styles.decorativeCircle1} />
-      <View style={styles.decorativeCircle2} />
-      <View style={styles.decorativeCircle3} />
-
-      <Animated.View 
-        style={[
-          styles.content,
-          {
-            opacity: fadeAnim,
-            transform: [{ scale: scaleAnim }],
-          },
-        ]}
-      >
-        {/* Logo y branding */}
-        <View style={styles.logoContainer}>
-          <View style={styles.logoCircle}>
-            <ThemedText style={styles.logoIcon}>🎯</ThemedText>
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <View style={styles.container}>
+        {/* Header con logo minimalista */}
+        <Animated.View 
+          style={[
+            styles.header,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <View style={styles.logoContainer}>
+            <View style={styles.logoIcon}>
+              <ThemedText style={styles.logoEmoji}>✓</ThemedText>
+            </View>
+            <ThemedText style={styles.appTitle}>TaskFlow</ThemedText>
+            <ThemedText style={styles.appSubtitle}>Gestión Inteligente</ThemedText>
           </View>
-          <ThemedText style={styles.appName}>TaskMaster AI</ThemedText>
-          <View style={styles.badge}>
-            <ThemedText style={styles.badgeText}>Powered by Gemini</ThemedText>
-          </View>
-        </View>
+        </Animated.View>
 
-        {/* Título y descripción */}
-        <View style={styles.textContainer}>
-          <ThemedText style={styles.title}>
-            Bienvenido al Futuro{'\n'}de la Productividad
-          </ThemedText>
-          <ThemedText style={styles.subtitle}>
-            Deja que la IA analice tus tareas y te recomiende{'\n'}
-            qué hacer en cada momento del día
-          </ThemedText>
-        </View>
+        {/* Contenido principal */}
+        <Animated.View 
+          style={[
+            styles.mainContent,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <View style={styles.welcomeSection}>
+            <ThemedText style={styles.welcomeTitle}>
+              Bienvenido
+            </ThemedText>
+            <ThemedText style={styles.welcomeDescription}>
+              Organiza tu día con recomendaciones{'\n'}
+              inteligentes basadas en IA
+            </ThemedText>
+          </View>
 
-        {/* Features */}
-        <View style={styles.featuresContainer}>
-          <View style={styles.feature}>
-            <ThemedText style={styles.featureIcon}>🤖</ThemedText>
-            <ThemedText style={styles.featureText}>Recomendaciones IA</ThemedText>
+          {/* Features minimalistas */}
+          <View style={styles.featuresGrid}>
+            <View style={styles.featureItem}>
+              <View style={styles.featureIconContainer}>
+                <ThemedText style={styles.featureIcon}>🎯</ThemedText>
+              </View>
+              <ThemedText style={styles.featureTitle}>Enfoque IA</ThemedText>
+              <ThemedText style={styles.featureDesc}>Recomendaciones personalizadas</ThemedText>
+            </View>
+            
+            <View style={styles.featureItem}>
+              <View style={styles.featureIconContainer}>
+                <ThemedText style={styles.featureIcon}>⚡</ThemedText>
+              </View>
+              <ThemedText style={styles.featureTitle}>Productivo</ThemedText>
+              <ThemedText style={styles.featureDesc}>Optimiza tu energía</ThemedText>
+            </View>
+            
+            <View style={styles.featureItem}>
+              <View style={styles.featureIconContainer}>
+                <ThemedText style={styles.featureIcon}>📊</ThemedText>
+              </View>
+              <ThemedText style={styles.featureTitle}>Analytics</ThemedText>
+              <ThemedText style={styles.featureDesc}>Seguimiento de progreso</ThemedText>
+            </View>
           </View>
-          <View style={styles.feature}>
-            <ThemedText style={styles.featureIcon}>⚡</ThemedText>
-            <ThemedText style={styles.featureText}>Perfil de Energía</ThemedText>
-          </View>
-          <View style={styles.feature}>
-            <ThemedText style={styles.featureIcon}>📅</ThemedText>
-            <ThemedText style={styles.featureText}>Sync Calendar</ThemedText>
-          </View>
-        </View>
+        </Animated.View>
 
-        {/* Botones */}
-        <View style={styles.buttonsContainer}>
+        {/* Footer con acciones */}
+        <Animated.View 
+          style={[
+            styles.footer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
           <TouchableOpacity
             style={[
-              styles.googleButton,
-              (!request || isLoading) && styles.googleButtonDisabled,
+              styles.primaryButton,
+              (!request || isLoading) && styles.primaryButtonDisabled,
             ]}
             onPress={handleGoogleLogin}
             disabled={!request || isLoading}
-            activeOpacity={0.8}
+            activeOpacity={0.9}
           >
-            <View style={styles.googleButtonContent}>
-              <ThemedText style={styles.googleIcon}>🔐</ThemedText>
-              <ThemedText style={styles.googleButtonText}>
+            <View style={styles.buttonContent}>
+              <View style={styles.googleIconContainer}>
+                <ThemedText style={styles.googleIcon}>G</ThemedText>
+              </View>
+              <ThemedText style={styles.primaryButtonText}>
                 {isLoading ? 'Conectando...' : 'Continuar con Google'}
               </ThemedText>
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.skipButton}
+            style={styles.secondaryButton}
             onPress={handleSkipLogin}
-            activeOpacity={0.7}
+            activeOpacity={0.8}
           >
-            <ThemedText style={styles.skipButtonText}>
-              Explorar sin cuenta
+            <ThemedText style={styles.secondaryButtonText}>
+              Probar sin cuenta
             </ThemedText>
           </TouchableOpacity>
-        </View>
 
-        {/* Disclaimer */}
-        <ThemedText style={styles.disclaimer}>
-          Al continuar, aceptas sincronizar con Google Calendar{'\n'}
-          y que la IA analice tus tareas de forma segura
-        </ThemedText>
-      </Animated.View>
-    </View>
+          <ThemedText style={styles.legalText}>
+            Al continuar aceptas la sincronización{'\n'}
+            segura con Google Calendar
+          </ThemedText>
+        </Animated.View>
+      </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#667eea',
+    backgroundColor: '#FFFFFF',
   },
-  decorativeCircle1: {
-    position: 'absolute',
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    top: -100,
-    right: -100,
-  },
-  decorativeCircle2: {
-    position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    bottom: -50,
-    left: -50,
-  },
-  decorativeCircle3: {
-    position: 'absolute',
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    top: height * 0.4,
-    right: 20,
-  },
-  content: {
-    flex: 1,
+  header: {
+    flex: 0.35,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 30,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 40,
-  },
-  logoCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
   },
   logoIcon: {
-    fontSize: 60,
-  },
-  appName: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 8,
-    letterSpacing: 1,
-  },
-  badge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+    width: 80,
+    height: 80,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  badgeText: {
+  logoEmoji: {
+    fontSize: 36,
     color: '#FFFFFF',
-    fontSize: 12,
     fontWeight: '600',
   },
-  textContainer: {
-    alignItems: 'center',
-    marginBottom: 40,
+  appTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    letterSpacing: -1,
+    marginBottom: 4,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 16,
-    color: '#FFFFFF',
-    lineHeight: 36,
-  },
-  subtitle: {
+  appSubtitle: {
     fontSize: 16,
-    textAlign: 'center',
-    color: 'rgba(255, 255, 255, 0.9)',
-    lineHeight: 24,
+    color: '#8E8E93',
+    fontWeight: '500',
+    letterSpacing: 0.5,
   },
-  featuresContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    marginBottom: 40,
-    paddingHorizontal: 20,
+  mainContent: {
+    flex: 0.5,
+    paddingHorizontal: 32,
+    justifyContent: 'center',
   },
-  feature: {
+  welcomeSection: {
     alignItems: 'center',
+    marginBottom: 48,
+  },
+  welcomeTitle: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: 12,
+    letterSpacing: -0.5,
+  },
+  welcomeDescription: {
+    fontSize: 17,
+    color: '#8E8E93',
+    textAlign: 'center',
+    lineHeight: 24,
+    fontWeight: '400',
+  },
+  featuresGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+  },
+  featureItem: {
     flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  featureIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#F2F2F7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   featureIcon: {
-    fontSize: 32,
-    marginBottom: 8,
+    fontSize: 24,
   },
-  featureText: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    textAlign: 'center',
+  featureTitle: {
+    fontSize: 15,
     fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: 4,
+    textAlign: 'center',
   },
-  buttonsContainer: {
-    width: '100%',
-    gap: 16,
+  featureDesc: {
+    fontSize: 12,
+    color: '#8E8E93',
+    textAlign: 'center',
+    lineHeight: 16,
   },
-  googleButton: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 18,
+  footer: {
+    flex: 0.3,
+    justifyContent: 'flex-end',
+    paddingHorizontal: 32,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  },
+  primaryButton: {
+    backgroundColor: '#007AFF',
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    paddingVertical: 16,
+    marginBottom: 12,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 4,
   },
-  googleButtonDisabled: {
+  primaryButtonDisabled: {
     opacity: 0.6,
   },
-  googleButtonContent: {
+  buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+  },
+  googleIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   googleIcon: {
-    fontSize: 24,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#007AFF',
   },
-  googleButtonText: {
-    color: '#667eea',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  skipButton: {
-    paddingVertical: 16,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  skipButtonText: {
+  primaryButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  secondaryButton: {
+    borderRadius: 16,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    backgroundColor: '#FAFAFA',
+    marginBottom: 20,
+  },
+  secondaryButtonText: {
+    color: '#007AFF',
+    fontSize: 17,
     fontWeight: '600',
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
-  disclaimer: {
-    fontSize: 11,
+  legalText: {
+    fontSize: 13,
+    color: '#8E8E93',
     textAlign: 'center',
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 24,
-    lineHeight: 16,
+    lineHeight: 18,
+    paddingHorizontal: 16,
   },
 });

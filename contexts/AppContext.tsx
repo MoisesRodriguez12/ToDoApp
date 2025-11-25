@@ -26,40 +26,24 @@ export interface DayPlan {
     evening: Task[];
   };
   reasoning: string;
-  // Nuevos campos para plan detallado
+  // Plan detallado de Gemini
   detailedPlan?: {
-    planTitle: string;
-    summary: {
-      totalTasks: number;
-      estimatedTime: string;
-      urgentTasks: number;
-      dueTodayTasks: number;
-    };
-    timeBlocks: {
-      period: string;
-      timeRange: string;
-      focus: string;
-      tasks: {
-        taskTitle: string;
-        startTime: string;
-        endTime: string;
-        duration: string;
-        priority: string;
-        reason: string;
-        tips: string;
-      }[];
-      breakSuggestion: string;
-      totalBlockTime: string;
+    planTitle?: string;
+    timeBlocks?: {
+      startTime: string;
+      endTime: string;
+      taskTitle: string;
+      taskType: string;
+      description: string;
+      whyNow: string;
     }[];
-    breaks: {
+    breaks?: {
       time: string;
-      duration: string;
-      activity: string;
-      reason: string;
+      duration: number;
+      type: string;
+      suggestion: string;
     }[];
-    generalTips: string[];
-    motivationalMessage: string;
-    contingencyPlan: string;
+    productivityTips?: string[];
   };
 }
 
@@ -450,9 +434,19 @@ ${dueTodayCount > 0 ? `🔴 **${dueTodayCount} tarea${dueTodayCount > 1 ? 's' : 
           evening,
         },
         reasoning,
-        detailedPlan: detailedPlanData && !detailedPlanData.error ? detailedPlanData : undefined,
+        detailedPlan: detailedPlanData && !detailedPlanData.error && detailedPlanData.detailedPlan ? {
+          planTitle: detailedPlanData.planTitle || 'Plan del Día',
+          ...detailedPlanData.detailedPlan,
+        } : undefined,
       };
 
+      console.log('✅ Plan construido para setDayPlan:', JSON.stringify(plan, null, 2).substring(0, 500));
+      console.log('🔍 detailedPlan estructura:', plan.detailedPlan ? {
+        planTitle: plan.detailedPlan.planTitle,
+        timeBlocks: plan.detailedPlan.timeBlocks?.length,
+        breaks: plan.detailedPlan.breaks?.length,
+        tips: plan.detailedPlan.productivityTips?.length,
+      } : 'undefined');
       setDayPlan(plan);
       console.log('✅ Plan del día generado exitosamente');
     } catch (error) {
