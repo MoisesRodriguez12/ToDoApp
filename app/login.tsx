@@ -10,9 +10,11 @@ import {
   Image,
   ScrollView,
   KeyboardAvoidingView,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useApp } from '@/contexts/AppContext';
@@ -20,9 +22,14 @@ import GoogleAuthService from '@/services/googleAuthService';
 
 const { width, height } = Dimensions.get('window');
 
+// Verificar si estamos en Expo Go o build nativo
+const isExpoGo = Constants.appOwnership === 'expo';
+
 export default function LoginScreen() {
   const router = useRouter();
   const { setUser } = useApp();
+  
+  // Solo usar el hook en Expo Go (desarrollo)
   const { request, response, promptAsync } = GoogleAuthService.useGoogleAuth();
   
   const [fadeAnim] = useState(new Animated.Value(0));
@@ -63,8 +70,39 @@ export default function LoginScreen() {
   };
 
   const handleGoogleLogin = async () => {
-    setIsLoading(true);
-    await promptAsync();
+    try {
+      setIsLoading(true);
+      
+      // En Expo Go (desarrollo), usar método web
+      if (isExpoGo) {
+        console.log('🌐 Usando autenticación web (Expo Go)...');
+        await promptAsync();
+      } else {
+        // En builds nativos, usar Google Sign-In nativo
+        console.log('📱 Usando Google Sign-In nativo...');
+        const user = await GoogleAuthService.authenticateUser();
+        
+        if (user) {
+          console.log('✅ Usuario autenticado:', user.email);
+          setUser(user);
+          setTimeout(() => {
+            console.log('🚀 Redirigiendo al dashboard...');
+            router.replace('/(tabs)');
+          }, 100);
+        } else {
+          console.log('⚠️ Usuario canceló el inicio de sesión');
+        }
+        setIsLoading(false);
+      }
+    } catch (error: any) {
+      console.error('❌ Error en autenticación:', error);
+      Alert.alert(
+        'Error de autenticación',
+        error.message || 'No se pudo iniciar sesión con Google.',
+        [{ text: 'OK' }]
+      );
+      setIsLoading(false);
+    }
   };
 
   const handleSkipLogin = () => {

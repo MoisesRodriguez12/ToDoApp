@@ -1,11 +1,16 @@
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
+import { Platform } from 'react-native';
 import { GOOGLE_CONFIG } from '../constants/googleConfig';
 import StorageService from './storageService';
 import { User } from '../types';
+import Constants from 'expo-constants';
 
 WebBrowser.maybeCompleteAuthSession();
+
+// Verificar si estamos en un build nativo o en Expo Go
+const isExpoGo = Constants.appOwnership === 'expo';
 
 export class GoogleAuthService {
   private static instance: GoogleAuthService;
@@ -20,15 +25,45 @@ export class GoogleAuthService {
   }
 
   /**
-   * Hook para autenticación con Google
+   * Método principal de autenticación que usa Google Play Services solo en builds nativos
+   */
+  async authenticateUser(): Promise<User | null> {
+    try {
+      console.log('🔐 Iniciando autenticación con Google...');
+      
+      // Si estamos en Expo Go (desarrollo), usar método web
+      if (isExpoGo) {
+        console.log('⚠️ Expo Go detectado - usa el método web (hook)');
+        throw new Error('En desarrollo, usa el botón de login que llama a promptAsync()');
+      }
+      
+      // En builds nativos, usar Google Sign-In nativo
+      const GoogleAuthNativeService = require('./googleAuthNativeService').default;
+      console.log('📱 Build nativo detectado - usando Google Sign-In nativo');
+      return await GoogleAuthNativeService.signIn();
+    } catch (error) {
+      console.error('❌ Error en autenticación:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Hook para autenticación con Google (fallback para desarrollo)
    */
   useGoogleAuth() {
-    // Para Expo, usar el Web Client ID funciona mejor en desarrollo
+    const redirectUri = makeRedirectUri({
+      scheme: 'todoapp',
+      preferLocalhost: false,
+    });
+
+    console.log('🔗 Redirect URI configurado:', redirectUri);
+
     const [request, response, promptAsync] = Google.useAuthRequest({
-      clientId: GOOGLE_CONFIG.WEB_CLIENT_ID,
-      iosClientId: GOOGLE_CONFIG.IOS_CLIENT_ID,
       androidClientId: GOOGLE_CONFIG.ANDROID_CLIENT_ID,
+      iosClientId: GOOGLE_CONFIG.IOS_CLIENT_ID,
+      webClientId: GOOGLE_CONFIG.WEB_CLIENT_ID,
       scopes: GOOGLE_CONFIG.SCOPES,
+      redirectUri,
     });
 
     return { request, response, promptAsync };
@@ -86,7 +121,18 @@ export class GoogleAuthService {
    * Cierra sesión
    */
   async signOut(): Promise<void> {
-    await StorageService.clearUser();
+    try {
+      // Solo usar el servicio nativo en builds nativos
+      if (!isExpoGo) {
+        const GoogleAuthNativeService = require('./googleAuthNativeService').default;
+        await GoogleAuthNativeService.signOut();
+      } else {
+        await StorageService.clearUser();
+      }
+    } catch (error) {
+      console.error('❌ Error al cerrar sesión:', error);
+      await StorageService.clearUser();
+    }
   }
 }
 

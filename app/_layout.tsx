@@ -1,10 +1,16 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
+import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppProvider } from '@/contexts/AppContext';
+
+// Configurar WebBrowser para deep links
+WebBrowser.maybeCompleteAuthSession();
 
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -12,6 +18,31 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    // Configurar el esquema de URL para deep links
+    const url = Linking.createURL('/');
+    console.log('🔗 Deep link URL base configurado:', url);
+
+    // Manejar deep links cuando la app está cerrada/minimizada
+    const handleDeepLink = (event: { url: string }) => {
+      console.log('📥 Deep link recibido:', event.url);
+      WebBrowser.maybeCompleteAuthSession();
+    };
+
+    // Escuchar deep links
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+
+    // Verificar si la app se abrió con un deep link
+    Linking.getInitialURL().then(url => {
+      if (url) {
+        console.log('🚀 App iniciada con deep link:', url);
+        WebBrowser.maybeCompleteAuthSession();
+      }
+    });
+
+    return () => subscription?.remove();
+  }, []);
 
   return (
     <AppProvider>

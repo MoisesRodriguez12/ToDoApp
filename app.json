@@ -28,7 +28,29 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "READ_CALENDAR",
-        "WRITE_CALENDAR"
+        "WRITE_CALENDAR",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.INTERNET"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "auth.expo.io"
+            },
+            {
+              "scheme": "todoapp"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "web": {
@@ -54,6 +76,12 @@
         {
           "calendarPermission": "La aplicación necesita acceso a tu calendario para sincronizar tareas."
         }
+      ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.869108899367-8t0g46nbcbg46ckql972eh46laommfhn"
+        }
       ]
     ],
     "experiments": {
@@ -61,7 +89,12 @@
       "reactCompiler": true
     },
     "extra": {
-      "GEMINI_API_KEY": "${GEMINI_API_KEY}"
-    }
+      "GEMINI_API_KEY": "${GEMINI_API_KEY}",
+      "router": {},
+      "eas": {
+        "projectId": "1fbbb459-3300-4b41-9fee-32fb903efa1f"
+      }
+    },
+    "owner": "moises.rodriguez"
   }
 }

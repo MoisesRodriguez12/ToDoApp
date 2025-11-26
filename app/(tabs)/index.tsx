@@ -419,11 +419,19 @@ export default function HomeScreen() {
       {showDayPlan && dayPlan && (
         <View style={styles.dayPlanSection}>
           <View style={styles.dayPlanHeader}>
-            <ThemedText style={styles.dayPlanTitle}>📋 Tu Plan para Hoy</ThemedText>
+            <ThemedText style={styles.dayPlanTitle}>
+              Tu plan para {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </ThemedText>
             <TouchableOpacity onPress={() => setShowDayPlan(false)}>
               <ThemedText style={styles.closeButton}>✕</ThemedText>
             </TouchableOpacity>
           </View>
+
+          <ScrollView 
+            style={styles.dayPlanScrollContainer}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+          >
 
           <View style={styles.dayPlanSummary}>
             <LinearGradient
@@ -588,10 +596,10 @@ export default function HomeScreen() {
                       </ThemedText>
                     </View>
                   ))}
-                </View>
-              )}
-
             </View>
+          )}
+
+          </View>
           )}
 
           {/* Mañana */}
@@ -734,6 +742,8 @@ export default function HomeScreen() {
               ))}
             </View>
           )}
+
+          </ScrollView>
         </View>
       )}
 
@@ -900,7 +910,6 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View style={styles.emptyStateCard}>
-            <ThemedText style={styles.emptyIcon}>📝</ThemedText>
             <ThemedText style={styles.emptyTitle}>
               No hay tareas pendientes
             </ThemedText>
@@ -1441,6 +1450,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 6,
+    maxHeight: '70%', // Limitar altura máxima
+  },
+  dayPlanScrollContainer: {
+    maxHeight: 400, // Altura máxima para el scroll interno
+    flexGrow: 0,
   },
   dayPlanHeader: {
     flexDirection: 'row',
@@ -1512,6 +1526,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   timeSlotCard: {
+    marginTop: 24,
     marginBottom: 16,
     padding: 16,
     backgroundColor: '#f8f9ff',
