@@ -75,27 +75,21 @@ export default function LoginScreen() {
       
       // En Expo Go (desarrollo), usar método web
       if (isExpoGo) {
-        console.log('🌐 Usando autenticación web (Expo Go)...');
         await promptAsync();
       } else {
         // En builds nativos, usar Google Sign-In nativo
-        console.log('📱 Usando Google Sign-In nativo...');
         const user = await GoogleAuthService.authenticateUser();
         
         if (user) {
-          console.log('✅ Usuario autenticado:', user.email);
           setUser(user);
           setTimeout(() => {
-            console.log('🚀 Redirigiendo al dashboard...');
             router.replace('/(tabs)');
           }, 100);
-        } else {
-          console.log('⚠️ Usuario canceló el inicio de sesión');
         }
         setIsLoading(false);
       }
     } catch (error: any) {
-      console.error('❌ Error en autenticación:', error);
+      console.error('Error en autenticación:', error);
       Alert.alert(
         'Error de autenticación',
         error.message || 'No se pudo iniciar sesión con Google.',

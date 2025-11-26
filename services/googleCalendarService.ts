@@ -132,7 +132,6 @@ export class GoogleCalendarService {
     // Si contiene algún patrón excluido, no importar
     for (const pattern of excludePatterns) {
       if (combined.includes(pattern)) {
-        console.log(`🚫 Skipping event: "${event.title}" (matched: ${pattern})`);
         return false;
       }
     }
@@ -140,17 +139,14 @@ export class GoogleCalendarService {
     // Si es un evento de todo el día sin descripción específica, probablemente es festivo
     const isAllDay = this.isAllDayEvent(event);
     if (isAllDay && (!event.notes || event.notes.trim().length < 10)) {
-      console.log(`🚫 Skipping all-day event without details: "${event.title}"`);
       return false;
     }
 
     // Si tiene menos de 3 caracteres, probablemente no es útil
     if (title.trim().length < 3) {
-      console.log(`🚫 Skipping too short event: "${event.title}"`);
       return false;
     }
 
-    console.log(`✅ Importing event: "${event.title}"`);
     return true;
   }
 
@@ -206,12 +202,12 @@ export class GoogleCalendarService {
     try {
       const hasPermission = await this.requestCalendarPermissions();
       if (!hasPermission) {
-        throw new Error('Calendar permission denied');
+        return null;
       }
 
       const calendarId = await this.getOrCreateAppCalendar();
       if (!calendarId) {
-        throw new Error('No calendar available');
+        return null;
       }
 
       const startDate = task.dueDate || new Date();
@@ -219,7 +215,7 @@ export class GoogleCalendarService {
 
       const eventId = await Calendar.createEventAsync(calendarId, {
         title: task.title,
-        notes: task.description,
+        notes: task.description ? `${task.description}\n\nCategoría: ${task.category}\nPrioridad: ${task.priority}` : `Categoría: ${task.category}\nPrioridad: ${task.priority}`,
         startDate,
         endDate,
         timeZone: 'UTC',
@@ -241,17 +237,21 @@ export class GoogleCalendarService {
    */
   async updateCalendarEvent(task: Task): Promise<boolean> {
     try {
-      if (!task.googleCalendarEventId) return false;
+      if (!task.googleCalendarEventId) {
+        return false;
+      }
 
       const hasPermission = await this.requestCalendarPermissions();
-      if (!hasPermission) return false;
+      if (!hasPermission) {
+        return false;
+      }
 
       const startDate = task.dueDate || new Date();
       const endDate = new Date(startDate.getTime() + task.estimatedEffort * 60000);
 
       await Calendar.updateEventAsync(task.googleCalendarEventId, {
         title: task.title,
-        notes: task.description,
+        notes: task.description ? `${task.description}\n\nCategoría: ${task.category}\nPrioridad: ${task.priority}` : `Categoría: ${task.category}\nPrioridad: ${task.priority}`,
         startDate,
         endDate,
       });

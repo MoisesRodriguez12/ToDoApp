@@ -22,11 +22,9 @@ export default function RootLayout() {
   useEffect(() => {
     // Configurar el esquema de URL para deep links
     const url = Linking.createURL('/');
-    console.log('🔗 Deep link URL base configurado:', url);
 
     // Manejar deep links cuando la app está cerrada/minimizada
     const handleDeepLink = (event: { url: string }) => {
-      console.log('📥 Deep link recibido:', event.url);
       WebBrowser.maybeCompleteAuthSession();
     };
 
@@ -36,7 +34,6 @@ export default function RootLayout() {
     // Verificar si la app se abrió con un deep link
     Linking.getInitialURL().then(url => {
       if (url) {
-        console.log('🚀 App iniciada con deep link:', url);
         WebBrowser.maybeCompleteAuthSession();
       }
     });

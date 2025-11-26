@@ -155,13 +155,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setTasks(updatedTasks);
       await StorageService.saveTasks(updatedTasks);
 
-      // Sincronizar con calendario si está habilitado
-      if (preferences?.syncWithGoogleCalendar) {
+      // Intentar crear evento en calendario (siempre)
+      try {
         const eventId = await GoogleCalendarService.exportTaskToCalendar(newTask);
         if (eventId) {
           newTask.googleCalendarEventId = eventId;
-          await StorageService.updateTask(newTask.id, { googleCalendarEventId: eventId });
+          // Actualizar la tarea con el eventId
+          const tasksWithEvent = updatedTasks.map(t => 
+            t.id === newTask.id ? { ...t, googleCalendarEventId: eventId } : t
+          );
+          setTasks(tasksWithEvent);
+          await StorageService.saveTasks(tasksWithEvent);
         }
+      } catch (calendarError) {
+        // No lanzar error, la tarea se creó correctamente
       }
     } catch (error) {
       console.error('Error adding task:', error);
@@ -177,10 +184,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setTasks(updatedTasks);
       await StorageService.saveTasks(updatedTasks);
 
-      // Actualizar calendario si está habilitado
+      // Actualizar calendario (siempre intentar)
       const task = updatedTasks.find(t => t.id === taskId);
-      if (task && preferences?.syncWithGoogleCalendar && task.googleCalendarEventId) {
-        await GoogleCalendarService.updateCalendarEvent(task);
+      if (task) {
+        try {
+          if (task.googleCalendarEventId) {
+            // Actualizar evento existente
+            await GoogleCalendarService.updateCalendarEvent(task);
+          } else if (task.status !== TaskStatus.COMPLETED) {
+            // Crear nuevo evento si no existe y no está completada
+            const eventId = await GoogleCalendarService.exportTaskToCalendar(task);
+            if (eventId) {
+              task.googleCalendarEventId = eventId;
+              const tasksWithEvent = updatedTasks.map(t => 
+                t.id === taskId ? { ...t, googleCalendarEventId: eventId } : t
+              );
+              setTasks(tasksWithEvent);
+              await StorageService.saveTasks(tasksWithEvent);
+            }
+          }
+        } catch (calendarError) {
+          // No lanzar error, la tarea se actualizó correctamente
+        }
       }
     } catch (error) {
       console.error('Error updating task:', error);
@@ -282,7 +307,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
 
       // Generar plan detallado con Gemini
-      console.log('🤖 Generando plan detallado con Gemini...');
       const detailedPlanData = await GeminiService.generateDetailedDayPlan(pendingTasks, energyProfile);
       
       // Calcular días hasta vencimiento para cada tarea
@@ -440,15 +464,7 @@ ${dueTodayCount > 0 ? `🔴 **${dueTodayCount} tarea${dueTodayCount > 1 ? 's' : 
         } : undefined,
       };
 
-      console.log('✅ Plan construido para setDayPlan:', JSON.stringify(plan, null, 2).substring(0, 500));
-      console.log('🔍 detailedPlan estructura:', plan.detailedPlan ? {
-        planTitle: plan.detailedPlan.planTitle,
-        timeBlocks: plan.detailedPlan.timeBlocks?.length,
-        breaks: plan.detailedPlan.breaks?.length,
-        tips: plan.detailedPlan.productivityTips?.length,
-      } : 'undefined');
       setDayPlan(plan);
-      console.log('✅ Plan del día generado exitosamente');
     } catch (error) {
       console.error('Error generating day plan:', error);
       throw error;

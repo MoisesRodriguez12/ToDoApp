@@ -23,15 +23,14 @@ export class GoogleAuthNativeService {
   private configure() {
     try {
       GoogleSignin.configure({
-        webClientId: GOOGLE_CONFIG.WEB_CLIENT_ID, // Requerido para Android
+        webClientId: GOOGLE_CONFIG.WEB_CLIENT_ID, // Requerido para Android - debe ser el OAuth 2.0 Web Client ID
         iosClientId: GOOGLE_CONFIG.IOS_CLIENT_ID,
         scopes: GOOGLE_CONFIG.SCOPES,
         offlineAccess: true,
         forceCodeForRefreshToken: true,
       });
-      console.log('✅ Google Sign-In configurado correctamente');
     } catch (error) {
-      console.error('❌ Error configurando Google Sign-In:', error);
+      console.error('Error configurando Google Sign-In:', error);
     }
   }
 
@@ -40,35 +39,30 @@ export class GoogleAuthNativeService {
    */
   async signIn(): Promise<User | null> {
     try {
-      console.log('🔐 Iniciando Google Sign-In nativo...');
-      
-      // Verificar servicios de Google Play
       await GoogleSignin.hasPlayServices({
         showPlayServicesUpdateDialog: true,
       });
       
-      // Obtener información del usuario
-      const userInfo = await GoogleSignin.signIn();
+      const response = await GoogleSignin.signIn();
       
-      // En v16, data contiene la información del usuario
-      const userData = userInfo.data;
-      if (!userData) {
-        throw new Error('No se pudo obtener información del usuario');
+      // v13 retorna { type, data }
+      if (response.type === 'cancelled') {
+        return null;
       }
       
-      console.log('✅ Usuario autenticado:', userData.user.email);
+      const userInfo = response.data;
       
       // Obtener tokens
       const tokens = await GoogleSignin.getTokens();
       
       // Crear objeto User
       const user: User = {
-        id: userData.user.id,
-        email: userData.user.email,
-        name: userData.user.name || '',
-        photoUrl: userData.user.photo || '',
+        id: userInfo.user.id,
+        email: userInfo.user.email,
+        name: userInfo.user.name || '',
+        photoUrl: userInfo.user.photo || '',
         googleAccessToken: tokens.accessToken,
-        googleRefreshToken: tokens.idToken || '', // v16 usa idToken en lugar de refreshToken
+        googleRefreshToken: userInfo.idToken || tokens.accessToken,
         createdAt: new Date(),
         lastLoginAt: new Date(),
       };
@@ -77,16 +71,13 @@ export class GoogleAuthNativeService {
       return user;
 
     } catch (error: any) {
-      console.error('❌ Error en Google Sign-In:', error);
+      console.error('Error en Google Sign-In:', error);
       
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        console.log('⚠️ Usuario canceló el inicio de sesión');
         return null;
       } else if (error.code === statusCodes.IN_PROGRESS) {
-        console.log('⏳ Inicio de sesión en progreso...');
         return null;
       } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        console.error('❌ Google Play Services no disponible');
         throw new Error('Google Play Services no está disponible en este dispositivo');
       }
       
@@ -112,19 +103,19 @@ export class GoogleAuthNativeService {
    */
   async getCurrentUser(): Promise<User | null> {
     try {
-      const userInfo = await GoogleSignin.signInSilently();
+      const response = await GoogleSignin.signInSilently();
       
-      if (userInfo && userInfo.data) {
+      if (response && response.type === 'success') {
         const tokens = await GoogleSignin.getTokens();
-        const userData = userInfo.data;
+        const userInfo = response.data;
         
         const user: User = {
-          id: userData.user.id,
-          email: userData.user.email,
-          name: userData.user.name || '',
-          photoUrl: userData.user.photo || '',
+          id: userInfo.user.id,
+          email: userInfo.user.email,
+          name: userInfo.user.name || '',
+          photoUrl: userInfo.user.photo || '',
           googleAccessToken: tokens.accessToken,
-          googleRefreshToken: tokens.idToken || '',
+          googleRefreshToken: userInfo.idToken || tokens.accessToken,
           createdAt: new Date(),
           lastLoginAt: new Date(),
         };
@@ -132,7 +123,7 @@ export class GoogleAuthNativeService {
         return user;
       }
     } catch (error) {
-      console.log('No hay usuario autenticado silenciosamente');
+      // Silent sign-in failed
     }
     
     return null;
@@ -145,9 +136,8 @@ export class GoogleAuthNativeService {
     try {
       await GoogleSignin.signOut();
       await StorageService.clearUser();
-      console.log('✅ Sesión cerrada correctamente');
     } catch (error) {
-      console.error('❌ Error al cerrar sesión:', error);
+      console.error('Error al cerrar sesión:', error);
       // Limpiar storage local aunque falle el signOut de Google
       await StorageService.clearUser();
     }
@@ -160,9 +150,8 @@ export class GoogleAuthNativeService {
     try {
       await GoogleSignin.revokeAccess();
       await StorageService.clearUser();
-      console.log('✅ Acceso revocado correctamente');
     } catch (error) {
-      console.error('❌ Error al revocar acceso:', error);
+      console.error('Error al revocar acceso:', error);
       await StorageService.clearUser();
     }
   }

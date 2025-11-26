@@ -67,10 +67,7 @@ export default function HomeScreen() {
   // Detectar cuando dayPlan cambia y tiene datos
   useEffect(() => {
     if (dayPlan && dayPlan.detailedPlan) {
-      console.log('🔄 dayPlan actualizado en UI con detailedPlan');
-      console.log('📊 timeBlocks:', (dayPlan as any).detailedPlan.timeBlocks?.length);
-      console.log('☕ breaks:', (dayPlan as any).detailedPlan.breaks?.length);
-      console.log('💡 tips:', (dayPlan as any).detailedPlan.productivityTips?.length);
+      // Day plan updated
     }
   }, [dayPlan]);
 
@@ -98,7 +95,6 @@ export default function HomeScreen() {
             shouldShowList: false,
           }),
         });
-        console.log('📵 Do Not Disturb mode enabled');
       }
     } catch (error) {
       console.error('Error enabling DND:', error);
@@ -116,7 +112,6 @@ export default function HomeScreen() {
         shouldShowList: true,
       }),
     });
-    console.log('🔔 Do Not Disturb mode disabled');
   };
 
   const startTimer = async (minutes: number, urgency: number) => {
@@ -359,45 +354,8 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={styles.planButton}
           onPress={async () => {
-            console.log('🚀 BOTÓN GENERAR PLAN PRESIONADO');
-            console.log(`📊 Tareas pendientes: ${pendingTasks.length}`);
-            
             setShowDayPlan(true); // Mostrar ANTES para que el estado esté listo
             await generateDayPlan();
-            
-            console.log('✅ generateDayPlan() COMPLETADO');
-            
-            // Esperar un tick para que el estado se actualice
-            setTimeout(() => {
-              console.log('═══════════════════════════════════════════════════════');
-              console.log('dayPlan recibido en componente:', JSON.stringify(dayPlan, null, 2));
-              console.log('═══════════════════════════════════════════════════════');
-              
-              if (dayPlan) {
-                console.log('📋 Estructura del plan en UI:');
-                console.log('- planTitle:', (dayPlan as any).planTitle);
-                console.log('- reasoning length:', dayPlan.reasoning?.length || 0);
-                console.log('- detailedPlan existe:', !!dayPlan.detailedPlan);
-                
-                if (dayPlan.detailedPlan) {
-                  console.log('  - timeBlocks:', (dayPlan as any).detailedPlan.timeBlocks?.length || 0);
-                  console.log('  - breaks:', (dayPlan as any).detailedPlan.breaks?.length || 0);
-                  console.log('  - productivityTips:', (dayPlan as any).detailedPlan.productivityTips?.length || 0);
-                  
-                  if ((dayPlan as any).detailedPlan.timeBlocks?.length > 0) {
-                    console.log('  📍 Primer bloque de tiempo:');
-                    console.log(JSON.stringify((dayPlan as any).detailedPlan.timeBlocks[0], null, 2));
-                  }
-                  
-                  if ((dayPlan as any).detailedPlan.breaks?.length > 0) {
-                    console.log('  ☕ Primer descanso:');
-                    console.log(JSON.stringify((dayPlan as any).detailedPlan.breaks[0], null, 2));
-                  }
-                }
-              } else {
-                console.log('⚠️ dayPlan es null o undefined');
-              }
-            }, 100);
           }}
           activeOpacity={0.8}
         >
@@ -1620,7 +1578,6 @@ const styles = StyleSheet.create({
   },
   // Estilos para el plan detallado
   detailedPlanContainer: {
-    maxHeight: 500,
     marginTop: 16,
   },
   timeBlockCard: {

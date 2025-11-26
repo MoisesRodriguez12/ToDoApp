@@ -29,20 +29,16 @@ export class GoogleAuthService {
    */
   async authenticateUser(): Promise<User | null> {
     try {
-      console.log('🔐 Iniciando autenticación con Google...');
-      
       // Si estamos en Expo Go (desarrollo), usar método web
       if (isExpoGo) {
-        console.log('⚠️ Expo Go detectado - usa el método web (hook)');
         throw new Error('En desarrollo, usa el botón de login que llama a promptAsync()');
       }
       
       // En builds nativos, usar Google Sign-In nativo
       const GoogleAuthNativeService = require('./googleAuthNativeService').default;
-      console.log('📱 Build nativo detectado - usando Google Sign-In nativo');
       return await GoogleAuthNativeService.signIn();
     } catch (error) {
-      console.error('❌ Error en autenticación:', error);
+      console.error('Error en autenticación:', error);
       throw error;
     }
   }
@@ -55,8 +51,6 @@ export class GoogleAuthService {
       scheme: 'todoapp',
       preferLocalhost: false,
     });
-
-    console.log('🔗 Redirect URI configurado:', redirectUri);
 
     const [request, response, promptAsync] = Google.useAuthRequest({
       androidClientId: GOOGLE_CONFIG.ANDROID_CLIENT_ID,
@@ -130,7 +124,7 @@ export class GoogleAuthService {
         await StorageService.clearUser();
       }
     } catch (error) {
-      console.error('❌ Error al cerrar sesión:', error);
+      console.error('Error al cerrar sesión:', error);
       await StorageService.clearUser();
     }
   }

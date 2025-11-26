@@ -187,7 +187,11 @@ Responde SOLO con JSON válido: {"category": "...", "priority": "..."}`;
       });
       
       setIsAddModalVisible(false);
-      Alert.alert('✓ Tarea agregada', 'La tarea ha sido agregada exitosamente');
+      Alert.alert(
+        '✅ Tarea creada', 
+        'La tarea ha sido agregada exitosamente y se ha creado un evento en tu calendario.',
+        [{ text: 'OK' }]
+      );
     } catch (error) {
       Alert.alert('Error', 'No se pudo agregar la tarea');
     }
@@ -203,7 +207,11 @@ Responde SOLO con JSON válido: {"category": "...", "priority": "..."}`;
       await updateTask(selectedTask.id, editTask);
       setIsEditModalVisible(false);
       setSelectedTask(null);
-      Alert.alert('✓ Tarea actualizada', 'Los cambios han sido guardados');
+      Alert.alert(
+        '✅ Tarea actualizada', 
+        'La tarea ha sido actualizada exitosamente. El evento en tu calendario también se ha actualizado.',
+        [{ text: 'OK' }]
+      );
     } catch (error) {
       Alert.alert('Error', 'No se pudo actualizar la tarea');
     }

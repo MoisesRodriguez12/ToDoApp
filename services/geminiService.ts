@@ -76,7 +76,7 @@ export class GeminiService {
       };
 
     } catch (error: any) {
-      console.error('❌ Error en recomendación:', error.message);
+      console.error('Error en recomendación:', error.message);
       return null;
     }
   }
@@ -143,65 +143,24 @@ Responde JSON puro (sin markdown):
       }
 
       const prompt = this.buildDayPlanPrompt(tasks);
-      console.log('📤 PROMPT ENVIADO A GEMINI:');
-      console.log('═══════════════════════════════════════════════════════');
-      console.log(prompt.substring(0, 500) + '...');
-      console.log('═══════════════════════════════════════════════════════');
-      
       const response = await this.callGemini(prompt);
-      
-      console.log('📥 RESPUESTA COMPLETA DE GEMINI:');
-      console.log('═══════════════════════════════════════════════════════');
-      console.log(response);
-      console.log('═══════════════════════════════════════════════════════');
-      console.log('📏 Longitud de respuesta:', response.length, 'caracteres');
       
       // Detectar si la respuesta está truncada
       if (!response.trim().endsWith('}') && !response.trim().endsWith(']')) {
-        console.error('⚠️ Respuesta truncada de Gemini - No termina con } o ]');
-        console.error('Últimos 100 caracteres:', response.slice(-100));
         throw new Error('Respuesta incompleta de Gemini');
       }
       
       const plan = this.parseJSON(response);
-      
-      console.log('✅ PLAN PARSEADO:');
-      console.log('═══════════════════════════════════════════════════════');
-      console.log(JSON.stringify(plan, null, 2));
-      console.log('═══════════════════════════════════════════════════════');
-      
-      if (plan?.detailedPlan?.timeBlocks) {
-        console.log(`📊 Bloques de tiempo: ${plan.detailedPlan.timeBlocks.length}`);
-        plan.detailedPlan.timeBlocks.forEach((block: any, i: number) => {
-          console.log(`  ${i + 1}. ${block.startTime || '??'} - ${block.endTime || '??'}: ${block.taskTitle || block.task || '??'}`);
-          console.log(`     Tipo: ${block.taskType || 'N/A'}`);
-          console.log(`     WhyNow: ${block.whyNow || 'N/A'}`);
-        });
-      }
-      
-      if (plan?.detailedPlan?.breaks) {
-        console.log(`☕ Descansos: ${plan.detailedPlan.breaks.length}`);
-        plan.detailedPlan.breaks.forEach((breakItem: any, i: number) => {
-          console.log(`  ${i + 1}. ${breakItem.time}: ${breakItem.duration}min - ${breakItem.type || 'break'}`);
-        });
-      }
-      
-      if (plan?.detailedPlan?.productivityTips) {
-        console.log(`💡 Consejos: ${plan.detailedPlan.productivityTips.length}`);
-      }
-      
       return plan;
 
     } catch (error: any) {
       // Retry on truncation error
       if (error.message.includes('Respuesta incompleta') && retryCount < MAX_RETRIES) {
-        console.warn(`🔄 Reintentando (${retryCount + 1}/${MAX_RETRIES})...`);
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
         return this.generateDetailedDayPlan(tasks, energyProfile, retryCount + 1);
       }
       
-      console.error('❌ Error generando plan:', error.message);
-      console.error('Stack:', error.stack);
+      console.error('Error generando plan:', error.message);
       return null;
     }
   }
@@ -299,13 +258,9 @@ ${tasksList}
   
   private async callGemini(prompt: string): Promise<string> {
     try {
-      console.log('🔄 Llamando a Gemini API...');
       const result = await this.model.generateContent(prompt);
-      console.log('✅ Respuesta recibida de Gemini');
-      console.log('📦 Result object:', JSON.stringify(result, null, 2));
       
       const response = result.response;
-      console.log('📄 Response object:', JSON.stringify(response, null, 2));
       
       // Intentar extraer texto de diferentes formas
       let text = '';
@@ -313,8 +268,6 @@ ${tasksList}
       try {
         text = response.text();
       } catch (textError) {
-        console.warn('⚠️ response.text() falló, intentando extracción manual');
-        
         // Intentar extraer manualmente de candidates
         if (response.candidates?.[0]?.content?.parts?.[0]?.text) {
           text = response.candidates[0].content.parts[0].text;
@@ -326,21 +279,14 @@ ${tasksList}
         }
       }
       
-      console.log('📝 Text extracted:', text?.substring(0, 200));
-      
       if (!text || text.trim().length === 0) {
-        console.error('❌ Gemini devolvió texto vacío');
-        console.error('📊 Response completo:', JSON.stringify(response, null, 2));
-        console.error('🔍 Candidates:', response.candidates?.[0]);
-        console.error('🔍 Parts:', response.candidates?.[0]?.content?.parts);
+        console.error('Gemini devolvió texto vacío');
         throw new Error('Gemini devolvió una respuesta vacía - posiblemente todos los tokens se usaron en thinking');
       }
       
       return text;
     } catch (error: any) {
-      console.error('❌ Error en callGemini:', error);
-      console.error('📋 Error message:', error.message);
-      console.error('📋 Error stack:', error.stack);
+      console.error('Error en callGemini:', error);
       throw new Error(`Gemini API error: ${error.message}`);
     }
   }
@@ -371,13 +317,11 @@ ${tasksList}
     } catch (error) {
       // Si el JSON está truncado, intentar repararlo
       if (error instanceof SyntaxError && text.includes('{')) {
-        console.error('⚠️ Respuesta truncada de Gemini');
-        console.error('📄 Respuesta parcial:', text);
+        console.error('Respuesta truncada de Gemini');
         throw new Error('Respuesta incompleta de Gemini - intenta de nuevo');
       }
       
-      console.error('❌ Error parseando JSON:', error instanceof Error ? error.message : 'Unknown');
-      console.error('📄 Respuesta:', text.substring(0, 500));
+      console.error('Error parseando JSON:', error instanceof Error ? error.message : 'Unknown');
       throw error;
     }
   }
@@ -386,7 +330,7 @@ ${tasksList}
     try {
       return await this.callGemini(prompt);
     } catch (error: any) {
-      console.error('❌ Error generando texto:', error.message);
+      console.error('Error generando texto:', error.message);
       return 'Error al generar texto.';
     }
   }
